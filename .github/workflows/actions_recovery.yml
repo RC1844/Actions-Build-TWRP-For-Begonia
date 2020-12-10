@@ -109,7 +109,8 @@ jobs:
           tree device
           ls -a
           export ALLOW_MISSING_DEPENDENCIES=true
-          . build/envsetup.sh
+          echo "export"
+          ./build/envsetup.sh
           echo ". build/envsetup.sh"
           lunch omni_${{ steps.var.outputs.device_code }}-eng 
           echo "lunch"
