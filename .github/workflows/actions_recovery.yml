@@ -107,10 +107,9 @@ jobs:
           PATH=~/bin:$PATH
           cd ${{ steps.pwd.outputs.pwd }}
           tree device
-          tree build
           export ALLOW_MISSING_DEPENDENCIES=true
           echo "export"
-          ./build/envsetup.sh
+          source build/envsetup.sh
           echo ". build/envsetup.sh"
           lunch omni_${{ steps.var.outputs.device_code }}-eng 
           echo "lunch"
