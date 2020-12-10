@@ -107,7 +107,7 @@ jobs:
           PATH=~/bin:$PATH
           cd ${{ steps.pwd.outputs.pwd }}
           tree device
-          ls -a
+          tree build
           export ALLOW_MISSING_DEPENDENCIES=true
           echo "export"
           ./build/envsetup.sh
