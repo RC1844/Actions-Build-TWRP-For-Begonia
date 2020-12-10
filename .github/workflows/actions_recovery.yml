@@ -107,10 +107,14 @@ jobs:
           PATH=~/bin:$PATH
           cd ${{ steps.pwd.outputs.pwd }}
           tree device
+          ls -a
           export ALLOW_MISSING_DEPENDENCIES=true
-          source build/envsetup.sh
+          . build/envsetup.sh
+          echo ". build/envsetup.sh"
           lunch omni_${{ steps.var.outputs.device_code }}-eng 
+          echo "lunch"
           mka recoveryimage -j$(nproc --all)
+          echo "mka"
 
       - name: Upload REC
         uses: softprops/action-gh-release@v1
