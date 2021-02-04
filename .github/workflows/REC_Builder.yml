@@ -1,5 +1,4 @@
-name: rec-building
-
+name: REC Builder
 on:
   watch:
     types: [started]

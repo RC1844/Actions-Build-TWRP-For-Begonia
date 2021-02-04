@@ -1,27 +1,9 @@
-name: Building recovery
+name: OFOX Builder
 
-on:
-  #  release:
-  #    types: [published]
-  #  push:
-  #    branches:
-  #      - master
-  #    paths:
-  #      - '.config'
-  #  schedule:
-  #    - cron: 0 8 * * 5
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-  watch:
-    types: [started]
+on: workflow_dispatch
 
 env:
-  MANIFEST: git://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni.git -b twrp-10.0
-  DEVICE: begonia
-  DT_LINK: https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0
-  DT_PATH: device/redmi/begonia
-  TARGET: recoveryimage
-  TZ: Asia/Shanghai
+  TZ: Asia/Kolkata
 
 jobs:
   build:
@@ -47,20 +29,32 @@ jobs:
 
       - name: Sync recovery source and device tree
         run: |
-          mkdir work
-          cd work
-          repo init -u $MANIFEST --depth=1 --groups=all,-notdefault,-device,-darwin,-x86,-mips
-          repo sync -j4
-          git clone $DT_LINK --depth=1 --single-branch $DT_PATH
+          cd
+          mkdir WorkSpace
+          cd WorkSpace
+          repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_9.0 --depth=1
+          repo sync -j8 --force-sync --optimized-fetch --no-clone-bundle
+          cd
+          cd WorkSpace
+          git clone https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0 device/redmi/begonia
 
-      - name: Building TWRP
+      - name: Now Lets build Ofox
         run: |
-          cd work
-          . build/envsetup.sh &&lunch omni_$DEVICE-eng &&export ALLOW_MISSING_DEPENDENCIES=true && mka $TARGET
+          cd
+          cd WorkSpace
+          source build/envsetup.sh
+          export ALLOW_MISSING_DEPENDENCIES=true
+          export FOX_USE_TWRP_RECOVERY_IMAGE_BUILDER=1
+          export LC_ALL="C"
+          export OF_MAINTAINER="Samyak , Ryukendo9"
+          export FOX_VERSION="Unofficial"
+          export OF_SCREEN_H=2160
+          lunch omni_begonia-eng
+          mka recoveryimage
 
       - name: Uploading recovery image
         run: |
-          cd work/out/target/product/$DEVICE
+          cd WorkSpace/out/target/product/$DEVICE
           sudo zip -r9 recovery.zip recovery.img
           tree
 
@@ -68,8 +62,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            work/out/target/product/${{ env.DEVICE }}/recovery.zip
-            work/out/target/product/${{ env.DEVICE }}/recovery.img
+            WorkSpace/out/target/product/${{ env.DEVICE }}/recovery.zip
+            WorkSpace/out/target/product/${{ env.DEVICE }}/recovery.img
           name: ${{ env.DEVICE }}
           tag_name: ${{ github.run_id }}
           body: Android Third-Party Recovery built
