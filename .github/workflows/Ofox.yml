@@ -19,25 +19,13 @@ jobs:
           docker rmi `docker images -q`
           sudo apt-get remove account-plugin-facebook account-plugin-flickr account-plugin-jabber account-plugin-salut account-plugin-twitter account-plugin-windows-live account-plugin-yahoo aisleriot brltty duplicity empathy empathy-common example-content gnome-accessibility-themes gnome-contacts gnome-mahjongg gnome-mines gnome-orca gnome-screensaver gnome-sudoku gnome-video-effects gnomine landscape-common libreoffice-avmedia-backend-gstreamer libreoffice-base-core libreoffice-calc libreoffice-common libreoffice-core libreoffice-draw libreoffice-gnome libreoffice-gtk libreoffice-impress libreoffice-math libreoffice-ogltrans libreoffice-pdfimport libreoffice-style-galaxy libreoffice-style-human libreoffice-writer libsane libsane-common mcp-account-manager-uoa python3-uno rhythmbox rhythmbox-plugins rhythmbox-plugin-zeitgeist sane-utils shotwell shotwell-common telepathy-gabble telepathy-haze telepathy-idle telepathy-indicator telepathy-logger telepathy-mission-control-5 telepathy-salut totem totem-common totem-plugins printer-driver-brlaser printer-driver-foo2zjs printer-driver-foo2zjs-common printer-driver-m2300w printer-driver-ptouch printer-driver-splix
           git config --global user.name "RC1844"
-          git config --global user.email "jainsamyak2002.sj@gmail.com"         
-          sudo -E apt-get -y purge azure-cli ghc* zulu* hhvm llvm* firefox google* dotnet* powershell openjdk* mysql* php* 
-          sudo -E apt-get clean 
+          git config --global user.email "1844766234@qq.com"
+          sudo -E apt-get -y purge azure-cli ghc* zulu* hhvm llvm* firefox google* dotnet* powershell openjdk* mysql* php*
+          sudo -E apt-get clean
           sudo -E apt-get -qq update
-
-      - name: Mkaing Dir Repo and setting up Environment
-        run: |
-          bash
-          cd 
-          mkdir bin
-          cd bin
-          curl http://commondatastorage.googleapis.com/git-repo-downloads/repo > ~/bin/repo 
-          chmod a+x ~/bin/repo
-          cd
-          cd bin
-          git clone https://github.com/akhilnarang/scripts.git scripts
-          cd
-          bash bin/scripts/setup/android_build_env.sh
-          bash bin/scripts/setup/install_android_sdk.sh
+          sudo -E apt-get -qq install bc build-essential zip curl libstdc++6 git wget python gcc clang libssl-dev repo rsync flex curl  bison aria2
+          sudo curl --create-dirs -L -o /usr/local/bin/repo -O -L https://storage.googleapis.com/git-repo-downloads/repo
+          sudo chmod a+rx /usr/local/bin/repo
 
       - name: Sync recovery source and device tree
         run: |
@@ -48,7 +36,7 @@ jobs:
           repo sync -j8 --force-sync --optimized-fetch --no-clone-bundle
           cd
           cd OrangeFox
-          git clone https://github.com/Rahuh-960/wayne device/xiaomi/wayne
+          git clone https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0 device/redmi/begonia
 
       - name: Now Lets build Ofox
         run: |
@@ -66,7 +54,7 @@ jobs:
 
       - name: Uploading recovery image
         run: |
-          cd work/out/target/product/$DEVICE
+          cd OrangeFox/out/target/product/$DEVICE
           sudo zip -r9 recovery.zip recovery.img
           tree
 
@@ -74,8 +62,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            work/out/target/product/${{ env.DEVICE }}/recovery.zip
-            work/out/target/product/${{ env.DEVICE }}/recovery.img
+            OrangeFox/out/target/product/${{ env.DEVICE }}/recovery.zip
+            OrangeFox/out/target/product/${{ env.DEVICE }}/recovery.img
           name: ${{ env.DEVICE }}
           tag_name: ${{ github.run_id }}
           body: Android Third-Party Recovery built
