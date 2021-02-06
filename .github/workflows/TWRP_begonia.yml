@@ -53,6 +53,14 @@ jobs:
           repo sync -j4
           git clone $DT_LINK --depth=1 --single-branch $DT_PATH
 
+      - name: Restore npm cache
+        uses: actions/cache@v2
+        with:
+          path: WorkSpace/out
+          key: ${{ runner.os }}-twrp-${{ env.DEVICE }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-twrp-${{ env.DEVICE }}
+
       - name: Building TWRP
         run: |
           cd WorkSpace
