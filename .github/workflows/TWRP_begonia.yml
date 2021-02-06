@@ -58,6 +58,12 @@ jobs:
           cd WorkSpace
           . build/envsetup.sh &&lunch omni_$DEVICE-eng &&export ALLOW_MISSING_DEPENDENCIES=true && mka $TARGET
 
+      - name: Get info
+        id: info
+        run: |
+          echo "::set-output name=date::$(/bin/date -u "+%Y%m%d")"
+        shell: bash
+
       - name: Uploading recovery image
         run: |
           cd WorkSpace/out/target/product/$DEVICE
@@ -70,15 +76,15 @@ jobs:
           files: |
             WorkSpace/out/target/product/${{ env.DEVICE }}/recovery.zip
             WorkSpace/out/target/product/${{ env.DEVICE }}/recovery.img
-          name: ${{ env.DEVICE }}
-          tag_name: ${{ github.run_id }}
+          name: ${{ env.DEVICE }}-${{ steps.info.outputs.date }}
+          tag_name: ${{ steps.info.outputs.date }}
           body: Android Third-Party Recovery built
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Remove old Releases
         uses: dev-drprasad/delete-older-releases@v0.1.0
-        if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+        # if: env.UPLOAD_RELEASE == 'true' && !cancelled()
         with:
           keep_latest: 3
           delete_tags: true
