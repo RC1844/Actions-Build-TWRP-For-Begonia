@@ -12,13 +12,11 @@
 	A Github Action to build Recovery
 </p>
 
-<div align="center">
-	<a href="../../actions">
-		<img src="../../workflows/rec-building/badge.svg" title="Building Status" />
-	</a>
-</div>
-
 <br />
+
+![REC Builder](../../workflows/TWRP%20Builder/badge.svg)
+![TWRP Builder](../../workflows/REC%20Builder/badge.svg)
+![OFOX Builder](../../workflows/OFOX%20Builder/badge.svg)
 
 由于编译时间较长，建议把<code>[.github/workflows/actions_recovery.yml](.github/workflows/actions_recovery.yml)</code>末尾上传处的`${{ secrets.GITHUB_TOKEN }}`改成自己的[Personal Access Token](https://github.com/settings/tokens)
 

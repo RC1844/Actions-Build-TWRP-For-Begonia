@@ -53,13 +53,15 @@ jobs:
           repo sync -j4
           git clone $DT_LINK --depth=1 --single-branch $DT_PATH
 
-      - name: Restore npm cache
+      - name: Restore out cache
         uses: actions/cache@v2
         with:
-          path: WorkSpace/out
-          key: ${{ runner.os }}-twrp-${{ env.DEVICE }}-${{ hashFiles('**/package-lock.json') }}
+          path: |
+            ~/.ccache
+            WorkSpace/out
+          key: ${{ runner.os }}-twrp-${{ env.DEVICE }}-${{ hashFiles('**/BoardConfig.mk') }}
           restore-keys: |
-            ${{ runner.os }}-twrp-${{ env.DEVICE }}
+            ${{ runner.os }}-REC-${{ env.DEVICE }}
 
       - name: Building TWRP
         run: |
@@ -72,7 +74,7 @@ jobs:
           echo "::set-output name=date::$(/bin/date -u "+%Y%m%d")"
         shell: bash
 
-      - name: Uploading recovery image
+      - name: Compressed file
         run: |
           cd WorkSpace/out/target/product/$DEVICE
           sudo zip -r9 recovery.zip recovery.img
