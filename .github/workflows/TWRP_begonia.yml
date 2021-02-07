@@ -58,10 +58,16 @@ jobs:
         with:
           path: |
             ~/.ccache
-            WorkSpace/out
           key: ${{ runner.os }}-twrp-${{ env.DEVICE }}-73586c751fb39ee96a7266056cd66c560fae225e19a818deebc88d3ddf863dda #${{ hashFiles('**/BoardConfig.mk') }}
           restore-keys: |
             ${{ runner.os }}-REC-${{ env.DEVICE }}
+
+      - name: Setup ccache
+        uses: alexjurkiewicz/setup-ccache@master
+        with:
+          max-size: 10G
+          extra-config: |
+            keep_comments_cpp = true
 
       - name: Building TWRP
         run: |
