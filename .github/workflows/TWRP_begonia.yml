@@ -77,7 +77,7 @@ jobs:
       - name: Get info
         id: info
         run: |
-          echo "::set-output name=date::$(/bin/date -u "+%Y%m%d")"
+          echo "::set-output name=date::$(/bin/date -u "+%Y%m%d%H%M%S")"
         shell: bash
 
       - name: Compressed file
@@ -85,6 +85,13 @@ jobs:
           cd WorkSpace/out/target/product/$DEVICE
           sudo zip -r9 recovery.zip recovery.img
           tree
+
+      - name: Upload firmware directory
+        uses: actions/upload-artifact@main
+        # if: steps.organize.outputs.status == 'success' && !cancelled()
+        with:
+          name: TWRP-${{ steps.info.outputs.date }}
+          path: WorkSpace/out/target/product/${{ env.DEVICE }}/recovery.img
 
       - name: Upload REC
         uses: softprops/action-gh-release@v1
@@ -106,3 +113,9 @@ jobs:
           delete_tags: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete workflow runs
+        uses: GitRML/delete-workflow-runs@main
+        with:
+          retain_days: 1
+          keep_minimum_runs: 10
