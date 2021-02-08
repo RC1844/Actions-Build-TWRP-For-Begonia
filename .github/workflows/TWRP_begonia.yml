@@ -53,7 +53,7 @@ jobs:
           repo sync -j4
           git clone $DT_LINK --depth=1 --single-branch $DT_PATH
 
-      - name: Restore out cache
+      - name: Restore cache
         uses: actions/cache@v2
         with:
           path: |
@@ -66,7 +66,7 @@ jobs:
       - name: Setup ccache
         uses: alexjurkiewicz/setup-ccache@master
         with:
-          max-size: 10G
+          max-size: 5G
           extra-config: |
             keep_comments_cpp = true
 
@@ -78,7 +78,7 @@ jobs:
       - name: Get info
         id: info
         run: |
-          echo "::set-output name=date::$(/bin/date -u "+%Y%m%d%H%M%S")"
+          echo "::set-output name=date::$(/bin/date -u "+%Y-%m-%d-%H-%M")"
         shell: bash
 
       - name: Compressed file
@@ -102,7 +102,7 @@ jobs:
             WorkSpace/out/target/product/${{ env.DEVICE }}/recovery.img
           name: ${{ env.DEVICE }}-${{ steps.info.outputs.date }}
           tag_name: ${{ steps.info.outputs.date }}
-          body: Android Third-Party Recovery built
+          body: ${{ env.DEVICE }} TWRP build at ${{ steps.info.outputs.date }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -110,7 +110,7 @@ jobs:
         uses: dev-drprasad/delete-older-releases@v0.1.0
         # if: env.UPLOAD_RELEASE == 'true' && !cancelled()
         with:
-          keep_latest: 3
+          keep_latest: 5
           delete_tags: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
