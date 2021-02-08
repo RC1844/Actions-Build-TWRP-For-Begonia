@@ -58,7 +58,7 @@ jobs:
         with:
           path: |
             ~/.ccache
-          key: ${{ runner.os }}-twrp-${{ env.DEVICE }}-73586c751fb39ee96a7266056cd66c560fae225e19a818deebc88d3ddf863dda #${{ hashFiles('**/BoardConfig.mk') }}
+          key: ${{ runner.os }}-twrp-${{ env.DEVICE }}-twrp-10 #${{ hashFiles('**/BoardConfig.mk') }}
           restore-keys: |
             ${{ runner.os }}-REC-${{ env.DEVICE }}
 
