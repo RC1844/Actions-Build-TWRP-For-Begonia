@@ -51,7 +51,7 @@ jobs:
       - name: Now Lets build Ofox
         run: |
           cd WorkSpace/sync
-          ./build_fox.sh omni_begonia-eng
+          ./build_fox.sh begonia
         # cd WorkSpace/sync/fox_10.0
         # source build/envsetup.sh
         # export ALLOW_MISSING_DEPENDENCIES=true
