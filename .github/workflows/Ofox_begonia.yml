@@ -34,12 +34,11 @@ jobs:
 
       - name: Sync recovery source and device tree
         run: |
-          cd
           mkdir WorkSpace
           cd WorkSpace
-          git clone git@gitlab.com:OrangeFox/sync.git
-          ./sync/get_fox_10.sh OrangeFox_10
-          git clone https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0 OrangeFox_10/device/redmi/begonia
+          rsync rsync://sources.orangefox.download/sources/fox_10.0 . --progress -a
+          tree -C -L 5
+          git clone https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0 device/redmi/begonia
 
       - name: Now Lets build Ofox
         run: |
