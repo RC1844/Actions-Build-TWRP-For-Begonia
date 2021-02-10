@@ -121,6 +121,12 @@ jobs:
           mka recoveryimage -j$(nproc --all)
           echo "mka"
 
+      - name: Get info
+        id: info
+        run: |
+          echo "::set-output name=date::$(/bin/date -u "+%Y-%m-%d-%H-%M")"
+        shell: bash
+
       - name: Upload REC
         uses: softprops/action-gh-release@v1
         with:

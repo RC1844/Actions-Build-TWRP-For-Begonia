@@ -3,7 +3,12 @@ name: OFOX Builder
 on: workflow_dispatch
 
 env:
-  TZ: Asia/Kolkata
+  MANIFEST: git://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni.git -b twrp-10.0
+  DEVICE: begonia
+  DT_LINK: https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0
+  DT_PATH: device/redmi/begonia
+  TARGET: recoveryimage
+  TZ: Asia/Shanghai
 
 jobs:
   build:
@@ -17,7 +22,7 @@ jobs:
         run: |
           sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/apt/sources.list.d
           docker rmi `docker images -q`
-          sudo apt-get remove account-plugin-facebook account-plugin-flickr account-plugin-jabber account-plugin-salut account-plugin-twitter account-plugin-windows-live account-plugin-yahoo aisleriot brltty duplicity empathy empathy-common example-content gnome-accessibility-themes gnome-contacts gnome-mahjongg gnome-mines gnome-orca gnome-screensaver gnome-sudoku gnome-video-effects gnomine landscape-common libreoffice-avmedia-backend-gstreamer libreoffice-base-core libreoffice-calc libreoffice-common libreoffice-core libreoffice-draw libreoffice-gnome libreoffice-gtk libreoffice-impress libreoffice-math libreoffice-ogltrans libreoffice-pdfimport libreoffice-style-galaxy libreoffice-style-human libreoffice-writer libsane libsane-common mcp-account-manager-uoa python3-uno rhythmbox rhythmbox-plugins rhythmbox-plugin-zeitgeist sane-utils shotwell shotwell-common telepathy-gabble telepathy-haze telepathy-idle telepathy-indicator telepathy-logger telepathy-mission-control-5 telepathy-salut totem totem-common totem-plugins printer-driver-brlaser printer-driver-foo2zjs printer-driver-foo2zjs-common printer-driver-m2300w printer-driver-ptouch printer-driver-splix
+          sudo apt-get remove account-plugin-facebook account-plugin-flickr account-plugin-jabber account-plugin-salut account-plugin-twitter account-plugin-windows-live account-plugin-yahoo aisleriot brltty duplicity empathy empathy-common example-content gnome-accessibility-themes gnome-contacts gnome-mahjongg gnome-mines gnome-orca gnome-screensaver gnome-sudoku gnome-video-effects gnomine landscape-common libreoffice-avmedia-backend-gstreamer libreoffice-base-core libreoffice-calc libreoffice-common libreoffice-core libreoffice-draw libreoffice-gnome libreoffice-gtk libreoffice-impress libreoffice-math libreoffice-ogltrans libreoffice-pdfimport libreoffice-style-galaxy libreoffice-style-human libreoffice-writer libsane libsane-common mcp-account-manager-uoa python3-uno rhythmbox rhythmbox-plugins rhythmbox-plugin-zeitgeist sane-utils shotwell shotwell-common telepathy-gabble telepathy-haze telepathy-idle telepathy-indicator telepathy-logger telepathy-mission-control-5 telepathy-salut totem totem-common totem-plugins printer-driver-brlaser printer-driver-foo2zjs printer-driver-foo2zjs-common printer-driver-m2300w printer-driver-ptouch printer-driver-splix ccache
           git config --global user.name "RC1844"
           git config --global user.email "1844766234@qq.com"
           sudo -E apt-get -y purge azure-cli ghc* zulu* hhvm llvm* firefox google* dotnet* powershell openjdk* mysql* php*
@@ -32,21 +37,19 @@ jobs:
           cd
           mkdir WorkSpace
           cd WorkSpace
-          repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_9.0 --depth=1
-          repo sync -j8 --force-sync --optimized-fetch --no-clone-bundle
-          cd
-          cd WorkSpace
-          git clone https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0 device/redmi/begonia
+          git clone git@gitlab.com:OrangeFox/sync.git
+          ./sync/get_fox_10.sh OrangeFox_10
+          git clone https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0 OrangeFox_10/device/redmi/begonia
 
       - name: Now Lets build Ofox
         run: |
           cd
-          cd WorkSpace
+          cd WorkSpace/OrangeFox_10
           source build/envsetup.sh
           export ALLOW_MISSING_DEPENDENCIES=true
           export FOX_USE_TWRP_RECOVERY_IMAGE_BUILDER=1
           export LC_ALL="C"
-          export OF_MAINTAINER="Samyak , Ryukendo9"
+          export OF_MAINTAINER="RC1844"
           export FOX_VERSION="Unofficial"
           export OF_SCREEN_H=2160
           lunch omni_begonia-eng
@@ -54,19 +57,32 @@ jobs:
 
       - name: Uploading recovery image
         run: |
-          cd WorkSpace/out/target/product/$DEVICE
-          sudo zip -r9 recovery.zip recovery.img
+          cd WorkSpace/OrangeFox_10/out/target/product/${{ env.DEVICE }}
+          sudo zip -r9 recovery.zip OrangeFox-unofficial-${{ env.DEVICE }}.img
           tree
+
+      - name: Get info
+        id: info
+        run: |
+          echo "::set-output name=date::$(/bin/date -u "+%Y-%m-%d-%H-%M")"
+        shell: bash
+
+      - name: Upload firmware directory
+        uses: actions/upload-artifact@main
+        # if: steps.organize.outputs.status == 'success' && !cancelled()
+        with:
+          name: TWRP-${{ steps.info.outputs.date }}
+          path: WorkSpace/OrangeFox_10/out/target/product/${{ env.DEVICE }}/OrangeFox-unofficial-${{ env.DEVICE }}.img
 
       - name: Upload REC
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            WorkSpace/out/target/product/${{ env.DEVICE }}/recovery.zip
-            WorkSpace/out/target/product/${{ env.DEVICE }}/recovery.img
-          name: ${{ env.DEVICE }}
-          tag_name: ${{ github.run_id }}
-          body: Android Third-Party Recovery built
+            WorkSpace/OrangeFox_10/out/target/product/${{ env.DEVICE }}/recovery.zip
+            WorkSpace/OrangeFox_10/out/target/product/${{ env.DEVICE }}/OrangeFox-unofficial-${{ env.DEVICE }}.img
+          name: ${{ env.DEVICE }}-${{ steps.info.outputs.date }}
+          tag_name: ${{ env.DEVICE }}-${{ github.run_id }}
+          body: ${{ env.DEVICE }} OFOX build at ${{ steps.info.outputs.date }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
