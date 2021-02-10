@@ -83,9 +83,10 @@ jobs:
 
       - name: Compressed file
         run: |
+          tree -C -d -L 5
           cd WorkSpace/out/target/product/$DEVICE
           sudo zip -r9 recovery.zip recovery.img
-          tree
+          tree -C -d -L 5
 
       - name: Upload firmware directory
         uses: actions/upload-artifact@main
