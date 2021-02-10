@@ -45,7 +45,7 @@ jobs:
       - name: Now Lets build Ofox
         run: |
           cd
-          cd WorkSpace/fox_10.0
+          cd WorkSpace/sync/fox_10.0
           source build/envsetup.sh
           export ALLOW_MISSING_DEPENDENCIES=true
           export FOX_USE_TWRP_RECOVERY_IMAGE_BUILDER=1
@@ -58,7 +58,7 @@ jobs:
 
       - name: Uploading recovery image
         run: |
-          cd WorkSpace/fox_10.0/out/target/product/${{ env.DEVICE }}
+          cd WorkSpace/sync/fox_10.0/out/target/product/${{ env.DEVICE }}
           sudo zip -r9 recovery.zip OrangeFox-unofficial-${{ env.DEVICE }}.img
           tree
 
@@ -73,14 +73,14 @@ jobs:
         # if: steps.organize.outputs.status == 'success' && !cancelled()
         with:
           name: TWRP-${{ steps.info.outputs.date }}
-          path: WorkSpace/fox_10.0/out/target/product/${{ env.DEVICE }}/OrangeFox-unofficial-${{ env.DEVICE }}.img
+          path: WorkSpace/sync/fox_10.0/out/target/product/${{ env.DEVICE }}/OrangeFox-unofficial-${{ env.DEVICE }}.img
 
       - name: Upload REC
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            WorkSpace/fox_10.0/out/target/product/${{ env.DEVICE }}/recovery.zip
-            WorkSpace/fox_10.0/out/target/product/${{ env.DEVICE }}/OrangeFox-unofficial-${{ env.DEVICE }}.img
+            WorkSpace/sync/fox_10.0/out/target/product/${{ env.DEVICE }}/recovery.zip
+            WorkSpace/sync/fox_10.0/out/target/product/${{ env.DEVICE }}/OrangeFox-unofficial-${{ env.DEVICE }}.img
           name: ${{ env.DEVICE }}-${{ steps.info.outputs.date }}
           tag_name: ${{ env.DEVICE }}-${{ github.run_id }}
           body: ${{ env.DEVICE }} OFOX build at ${{ steps.info.outputs.date }}
