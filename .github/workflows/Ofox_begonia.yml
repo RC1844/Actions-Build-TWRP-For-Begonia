@@ -31,6 +31,10 @@ jobs:
           sudo -E apt-get -qq install bc build-essential zip curl libstdc++6 git wget python gcc clang libssl-dev repo rsync flex curl  bison aria2 ccache
           sudo curl --create-dirs -L -o /usr/local/bin/repo -O -L https://storage.googleapis.com/git-repo-downloads/repo
           sudo chmod a+rx /usr/local/bin/repo
+          git clone https://gitlab.com/OrangeFox/misc/scripts
+          cd scripts
+          sudo -E bash setup/android_build_env.sh
+          sudo -E bash setup/install_android_sdk.sh
 
       - name: Sync recovery source and device tree
         run: |
