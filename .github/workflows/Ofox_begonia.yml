@@ -28,7 +28,7 @@ jobs:
           sudo -E apt-get -y purge azure-cli ghc* zulu* hhvm llvm* firefox google* dotnet* powershell openjdk* mysql* php*
           sudo -E apt-get clean
           sudo -E apt-get -qq update
-          sudo -E apt-get -qq install bc build-essential zip curl libstdc++6 git wget python gcc clang libssl-dev repo rsync flex curl  bison aria2
+          sudo -E apt-get -qq install bc build-essential zip curl libstdc++6 git wget python gcc clang libssl-dev repo rsync flex curl  bison aria2 ccache
           sudo curl --create-dirs -L -o /usr/local/bin/repo -O -L https://storage.googleapis.com/git-repo-downloads/repo
           sudo chmod a+rx /usr/local/bin/repo
 
@@ -42,20 +42,22 @@ jobs:
           git clone --depth=1 https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0 fox_10.0/device/redmi/begonia
 
       - name: show tree
-        run: tree -C -d -L 5
+        run: tree -C -d -L 6
 
       - name: Now Lets build Ofox
         run: |
-          cd WorkSpace/sync/fox_10.0
-          source build/envsetup.sh
-          export ALLOW_MISSING_DEPENDENCIES=true
-          export FOX_USE_TWRP_RECOVERY_IMAGE_BUILDER=1
-          export LC_ALL="C"
-          export OF_MAINTAINER="RC1844"
-          export FOX_VERSION="Unofficial"
-          export OF_SCREEN_H=2160
-          lunch omni_begonia-eng
-          mka recoveryimage
+          cd WorkSpace/sync
+          ./build_fox.sh omni_begonia-eng
+        # cd WorkSpace/sync/fox_10.0
+        # source build/envsetup.sh
+        # export ALLOW_MISSING_DEPENDENCIES=true
+        # export FOX_USE_TWRP_RECOVERY_IMAGE_BUILDER=1
+        # export LC_ALL="C"
+        # export OF_MAINTAINER="RC1844"
+        # export FOX_VERSION="Unofficial"
+        # export OF_SCREEN_H=2160
+        # lunch omni_begonia-eng
+        # mka recoveryimage
 
       - name: Uploading recovery image
         run: |
