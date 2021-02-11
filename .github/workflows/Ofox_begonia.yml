@@ -42,6 +42,7 @@ jobs:
           cd WorkSpace
           git clone --depth=1 https://gitlab.com/OrangeFox/sync.git
           cd sync
+          sed -i 's/USE_SSH="1"/USE_SSH="0"/g' get_fox_10.sh
           ./get_fox_10.sh
           git clone --depth=1 https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0 fox_10.0/device/redmi/begonia
 
