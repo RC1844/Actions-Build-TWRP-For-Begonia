@@ -24,7 +24,6 @@ env:
   DT_path: device/redmi/begonia
   target: recoveryimage
   WorkSpace: WorkSpace
-  OutFolder: ${{env.WorkSpace}}/out/target/product/${{ env.device }}
   TZ: Asia/Shanghai
   Enable_cache: false
   Enable_ccache: false
@@ -100,30 +99,31 @@ jobs:
           mka ${{env.target}}
         shell: bash
 
-      - name: Show out tree
-        run: |
-          cd ${{env.OutFolder}}
-          sudo zip -r9 recovery.zip recovery.img
-          tree -C -L 5
 
       - name: Get info
         id: info
         run: |
           echo "::set-output name=date::$(/bin/date -u "+%Y-%m-%d-%H-%M")"
+          echo "::set-output name=OutFolder::$(${{env.WorkSpace}}/out/target/product/${{ env.device }})"
         shell: bash
 
+      - name: Show out tree
+        run: |
+          cd ${{steps.info.outputs.OutFolder}}
+          sudo zip -r9 recovery.zip recovery.img
+          tree -C -L 5
       - name: Upload firmware directory
         uses: actions/upload-artifact@main
         # if: steps.organize.outputs.status == 'success' && !cancelled()
         with:
           name: ${{env.Rec_name}}_for_${{ env.device }}-${{ github.run_id }}
-          path: ${{env.OutFolder}}/*.img
+          path: ${{steps.info.outputs.OutFolder}}/*.img
       - name: Upload Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            ${{env.OutFolder}}/recovery.zip
-            ${{env.OutFolder}}/recovery.img
+            ${{steps.info.outputs.OutFolder}}/recovery.zip
+            ${{steps.info.outputs.OutFolder}}/recovery.img
           name: ${{env.Rec_name}}-${{ env.device }}-${{ github.run_id }}
           tag_name: ${{ env.device }}-${{env.Rec_name}}-${{ steps.info.outputs.date }}
           body: ${{env.Rec_name}}-${{env.Rec_ver}} for ${{ env.device }} build at ${{ steps.info.outputs.date }}
