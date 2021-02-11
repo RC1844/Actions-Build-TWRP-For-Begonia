@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@master
 
       - name: Get info
-        id: info
+        id: infos
         run: |
           echo "::set-output name=date::$(/bin/date -u "+%Y-%m-%d-%H-%M")"
           echo "::set-output name=OutFolder::$(${{env.WorkSpace}}/out/target/product/${{ env.device }})"
