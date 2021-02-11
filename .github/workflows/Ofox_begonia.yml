@@ -10,7 +10,6 @@ env:
   DT_url: https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0
   DT_path: device/redmi/begonia
   target: recoveryimage
-  TZ: Asia/Shanghai
   WorkSpace: WorkSpace/sync/fox_10.0
   OutFolder: ${{env.WorkSpace}}/out/target/product/${{ env.device }}
   TZ: Asia/Shanghai
