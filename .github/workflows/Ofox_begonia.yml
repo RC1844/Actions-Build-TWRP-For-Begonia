@@ -25,12 +25,12 @@ jobs:
           sudo apt-get remove account-plugin-facebook account-plugin-flickr account-plugin-jabber account-plugin-salut account-plugin-twitter account-plugin-windows-live account-plugin-yahoo aisleriot brltty duplicity empathy empathy-common example-content gnome-accessibility-themes gnome-contacts gnome-mahjongg gnome-mines gnome-orca gnome-screensaver gnome-sudoku gnome-video-effects gnomine landscape-common libreoffice-avmedia-backend-gstreamer libreoffice-base-core libreoffice-calc libreoffice-common libreoffice-core libreoffice-draw libreoffice-gnome libreoffice-gtk libreoffice-impress libreoffice-math libreoffice-ogltrans libreoffice-pdfimport libreoffice-style-galaxy libreoffice-style-human libreoffice-writer libsane libsane-common mcp-account-manager-uoa python3-uno rhythmbox rhythmbox-plugins rhythmbox-plugin-zeitgeist sane-utils shotwell shotwell-common telepathy-gabble telepathy-haze telepathy-idle telepathy-indicator telepathy-logger telepathy-mission-control-5 telepathy-salut totem totem-common totem-plugins printer-driver-brlaser printer-driver-foo2zjs printer-driver-foo2zjs-common printer-driver-m2300w printer-driver-ptouch printer-driver-splix
           sudo -E apt-get -y purge azure-cli ghc* zulu* hhvm llvm* firefox google* dotnet* powershell openjdk* mysql* php*
 
-      - name: Initializing delete environment
+      - name: Initializing environment
         run: |
           sudo -E apt-get clean
           sudo -E apt-get -qq update
           sudo -E apt-get -qq install curl libstdc++6 git wget repo rsync aria2
-          git clone https://gitlab.com/OrangeFox/misc/scripts
+          git clone https://gitlab.com/OrangeFox/misc/scripts --depth=1 --single-branch
           cd scripts
           sudo -E bash setup/android_build_env.sh
           sudo -E bash setup/install_android_sdk.sh
@@ -39,7 +39,7 @@ jobs:
         run: |
           mkdir WorkSpace
           cd WorkSpace
-          git clone --depth=1 https://gitlab.com/OrangeFox/sync.git
+          git clone https://gitlab.com/OrangeFox/sync.git --depth=1 --single-branch
           cd sync
           sed -i 's/USE_SSH="1"/USE_SSH="0"/g' get_fox_10.sh
           ./get_fox_10.sh
@@ -48,7 +48,7 @@ jobs:
         run: |
           cd WorkSpace/sync/fox_10.0
           git clone $DT_LINK --depth=1 --single-branch $DT_PATH
-          rm -f fox_10.0/device/redmi/begonia/recovery
+          rm -f device/redmi/begonia/recovery
 
       - name: Show tree
         run: tree -C -d -L 6
