@@ -24,13 +24,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@master
 
-      - name: Get info
-        id: infos
-        run: |
-          echo "::set-output name=date::$(/bin/date -u "+%Y-%m-%d-%H-%M")"
-          echo "::set-output name=OutFolder::"${{env.WorkSpace}}/out/target/product/${{ env.device }}""
-        shell: bash
-
       - name: Delete old environment
         run: |
           sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/apt/sources.list.d

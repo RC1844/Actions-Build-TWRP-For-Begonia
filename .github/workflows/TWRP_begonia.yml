@@ -104,7 +104,7 @@ jobs:
         id: info
         run: |
           echo "::set-output name=date::$(/bin/date -u "+%Y-%m-%d-%H-%M")"
-          echo "::set-output name=OutFolder::$(${{env.WorkSpace}}/out/target/product/${{ env.device }})"
+          echo "::set-output name=OutFolder::"${{env.WorkSpace}}/out/target/product/${{ env.device }}""
         shell: bash
 
       - name: Show out tree
