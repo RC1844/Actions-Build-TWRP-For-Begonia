@@ -50,12 +50,12 @@ jobs:
           sudo -E apt-get clean
           sudo -E apt-get -qq update
           sudo -E apt-get -qq install curl libstdc++6 git wget repo rsync aria2
-        # git config --global user.name "RC1844"
-        # git config --global user.email "1844766234@qq.com"
-        # git clone https://gitlab.com/OrangeFox/misc/scripts --depth=1 --single-branch
-        # cd scripts
-        # sudo -E bash setup/android_build_env.sh
-        # sudo -E bash setup/install_android_sdk.sh
+          git config --global user.name "RC1844"
+          git config --global user.email "1844766234@qq.com"
+          git clone https://gitlab.com/OrangeFox/misc/scripts --depth=1 --single-branch
+          cd scripts
+          sudo -E bash setup/android_build_env.sh
+          sudo -E bash setup/install_android_sdk.sh
 
       - name: Sync recovery source
         run: |
