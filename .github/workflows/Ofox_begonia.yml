@@ -10,7 +10,7 @@ env:
   DT_url: https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0
   DT_path: device/redmi/begonia
   target: recoveryimage
-  WorkSpace: WorkSpace/sync/fox_10.0
+  WorkSpace: WorkSpace
   TZ: Asia/Shanghai
   Enable_cache: false
   Enable_ccache: false
@@ -47,10 +47,12 @@ jobs:
         run: |
           mkdir WorkSpace
           cd WorkSpace
-          git clone https://gitlab.com/OrangeFox/sync.git --depth=1 --single-branch
-          cd sync
-          sed -i 's/USE_SSH="1"/USE_SSH="0"/g' get_fox_10.sh
-          ./get_fox_10.sh
+          repo init -u ${{env.Rec_url}} --depth=1 --groups=all,-notdefault,-device,-darwin,-x86,-mips
+          repo sync -j4
+        # git clone https://gitlab.com/OrangeFox/sync.git --depth=1 --single-branch
+        # cd sync
+        # sed -i 's/USE_SSH="1"/USE_SSH="0"/g' get_fox_10.sh
+        # ./get_fox_10.sh
 
       - name: Sync device tree
         run: |
