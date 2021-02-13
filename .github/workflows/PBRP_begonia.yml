@@ -1,0 +1,149 @@
+name: PBRP Builder
+
+on:
+  #  release:
+  #    types: [published]
+  #  push:
+  #    branches:
+  #      - master
+  #    paths:
+  #      - '.config'
+  #  schedule:
+  #    - cron: 0 8 * * 5
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+  # watch:
+  #   types: [started]
+
+env:
+  Rec_name: PBRP
+  Rec_ver: 3.0.0
+  Rec_url: git://github.com/PitchBlackRecoveryProject/manifest_pb.git -b android-10.0
+  device: begonia
+  DT_url: https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0
+  DT_path: device/redmi/begonia
+  target: recoveryimage
+  WorkSpace: WorkSpace
+  TZ: Asia/Shanghai
+  Enable_cache: false
+  Enable_ccache: false
+  Delete_old: false
+
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+
+      - name: Delete old environment
+        # if: env.Enable_cache == 'true' && !cancelled()
+        run: |
+          sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/apt/sources.list.d
+          docker rmi `docker images -q`
+          sudo apt-get remove account-plugin-facebook account-plugin-flickr account-plugin-jabber account-plugin-salut account-plugin-twitter account-plugin-windows-live account-plugin-yahoo aisleriot brltty duplicity empathy empathy-common example-content gnome-accessibility-themes gnome-contacts gnome-mahjongg gnome-mines gnome-orca gnome-screensaver gnome-sudoku gnome-video-effects gnomine landscape-common libreoffice-avmedia-backend-gstreamer libreoffice-base-core libreoffice-calc libreoffice-common libreoffice-core libreoffice-draw libreoffice-gnome libreoffice-gtk libreoffice-impress libreoffice-math libreoffice-ogltrans libreoffice-pdfimport libreoffice-style-galaxy libreoffice-style-human libreoffice-writer libsane libsane-common mcp-account-manager-uoa python3-uno rhythmbox rhythmbox-plugins rhythmbox-plugin-zeitgeist sane-utils shotwell shotwell-common telepathy-gabble telepathy-haze telepathy-idle telepathy-indicator telepathy-logger telepathy-mission-control-5 telepathy-salut totem totem-common totem-plugins printer-driver-brlaser printer-driver-foo2zjs printer-driver-foo2zjs-common printer-driver-m2300w printer-driver-ptouch printer-driver-splix
+          sudo -E apt-get -y purge azure-cli ghc* zulu* hhvm llvm* firefox google* dotnet* powershell openjdk* mysql* php*
+
+      - name: Initializing environment
+        run: |
+          sudo -E apt-get clean
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq install curl libstdc++6 git wget repo rsync aria2
+          git config --global user.name "RC1844"
+          git config --global user.email "1844766234@qq.com"
+          git clone https://gitlab.com/OrangeFox/misc/scripts --depth=1 --single-branch
+          cd scripts
+          sudo -E bash setup/android_build_env.sh
+          sudo -E bash setup/install_android_sdk.sh
+
+      - name: Sync recovery source
+        run: |
+          mkdir WorkSpace
+          cd WorkSpace
+          repo init -u ${{env.Rec_url}} --depth=1 --groups=all,-notdefault,-device,-darwin,-x86,-mips
+          repo sync -j4
+
+      - name: Sync device tree
+        run: |
+          cd ${{env.WorkSpace}}
+          git clone ${{ env.DT_url }} --depth=1 --single-branch ${{ env.DT_path }}
+          sed -i 's/vendor\/omni/vendor\/pb/g' ${{ env.DT_path }}/omni_begonia.mk
+
+      - name: Show tree
+        run: tree -C -d -L 6
+
+      - name: Restore cache
+        uses: actions/cache@v2
+        if: env.Enable_cache == 'true' && !cancelled()
+        with:
+          path: |
+            ~/.ccache
+            ${{env.WorkSpace}}/out
+          key: ${{ runner.os }}-${{env.Rec_name}}-${{env.Rec_ver}}-${{ env.device }} #${{ hashFiles('**/BoardConfig.mk') }}
+          restore-keys: |
+            ${{ runner.os }}-${{env.Rec_name}}-${{env.Rec_ver}}-${{ env.device }}
+
+      - name: Setup ccache
+        uses: alexjurkiewicz/setup-ccache@master
+        if: env.Enable_ccache == 'true' && !cancelled()
+        with:
+          max-size: 5G
+          extra-config: |
+            keep_comments_cpp = true
+
+      - name: Building ${{env.Rec_name}}
+        run: |
+          cd ${{env.WorkSpace}}
+          source build/envsetup.sh
+          export ALLOW_MISSING_DEPENDENCIES=true
+          lunch omni_${{ env.device }}-eng
+          mka ${{env.target}}
+        shell: bash
+
+
+      - name: Get info
+        id: info
+        run: |
+          echo "::set-output name=date::$(/bin/date -u "+%Y-%m-%d-%H-%M")"
+          echo "::set-output name=OutFolder::"${{env.WorkSpace}}/out/target/product/${{ env.device }}""
+        shell: bash
+
+      - name: Show out tree
+        run: |
+          cd ${{steps.info.outputs.OutFolder}}
+          sudo zip -r9 recovery.zip recovery.img
+          tree -C -L 5
+      - name: Upload firmware directory
+        uses: actions/upload-artifact@main
+        # if: steps.organize.outputs.status == 'success' && !cancelled()
+        with:
+          name: ${{env.Rec_name}}_for_${{ env.device }}-${{ github.run_id }}
+          path: ${{steps.info.outputs.OutFolder}}/*.img
+      - name: Upload Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ${{steps.info.outputs.OutFolder}}/recovery.zip
+            ${{steps.info.outputs.OutFolder}}/recovery.img
+          name: ${{env.Rec_name}}-${{ env.device }}-${{ github.run_id }}
+          tag_name: ${{ env.device }}-${{env.Rec_name}}-${{ steps.info.outputs.date }}
+          body: ${{env.Rec_name}}-${{env.Rec_ver}} for ${{ env.device }} build at ${{ steps.info.outputs.date }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Remove old Releases
+        uses: dev-drprasad/delete-older-releases@v0.1.0
+        if: env.Delete_old == 'true' && !cancelled()
+        with:
+          keep_latest: 12
+          delete_tags: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete workflow runs
+        uses: GitRML/delete-workflow-runs@main
+        if: env.Delete_old == 'true' && !cancelled()
+        with:
+          retain_days: 1
+          keep_minimum_runs: 10
