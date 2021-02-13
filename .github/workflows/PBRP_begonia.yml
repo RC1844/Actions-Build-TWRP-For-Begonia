@@ -68,7 +68,9 @@ jobs:
         run: |
           cd ${{env.WorkSpace}}
           git clone ${{ env.DT_url }} --depth=1 --single-branch ${{ env.DT_path }}
-          sed -i 's/vendor\/omni/vendor\/pb/g' ${{ env.DT_path }}/omni_begonia.mk
+          cd ${{ env.DT_path }}
+          sed -i 's/vendor\/omni/vendor\/pb/g' omni_begonia.mk
+          cp -r recovery/root/system/etc/ recovery/root/etc/
 
       - name: Show tree
         run: tree -C -d -L 6
@@ -96,11 +98,12 @@ jobs:
         run: |
           cd ${{env.WorkSpace}}
           source build/envsetup.sh
-          export ALLOW_MISSING_DEPENDENCIES=true
+          export MAINTAINER = "Github @RC1844"
+          export PB_TORCH_PATH = /sys/class/leds/flash-light0
+          export CODENAME = "begonia"
           lunch omni_${{ env.device }}-eng
           mka ${{env.target}}
         shell: bash
-
 
       - name: Get info
         id: info
@@ -113,12 +116,16 @@ jobs:
         run: |
           cd ${{steps.info.outputs.OutFolder}}
           tree -C -L 5
+
       - name: Upload firmware directory
         uses: actions/upload-artifact@main
         # if: steps.organize.outputs.status == 'success' && !cancelled()
         with:
           name: ${{env.Rec_name}}_for_${{ env.device }}-${{ github.run_id }}
-          path: ${{steps.info.outputs.OutFolder}}/*.img
+          path: |
+            ${{steps.info.outputs.OutFolder}}/*.img
+            ${{steps.info.outputs.OutFolder}}/*.zip
+
       - name: Upload Release
         uses: softprops/action-gh-release@v1
         with:

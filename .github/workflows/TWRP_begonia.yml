@@ -100,7 +100,6 @@ jobs:
           mka ${{env.target}}
         shell: bash
 
-
       - name: Get info
         id: info
         run: |
@@ -113,12 +112,14 @@ jobs:
           cd ${{steps.info.outputs.OutFolder}}
           sudo zip -r9 recovery.zip recovery.img
           tree -C -L 5
+
       - name: Upload firmware directory
         uses: actions/upload-artifact@main
         # if: steps.organize.outputs.status == 'success' && !cancelled()
         with:
           name: ${{env.Rec_name}}_for_${{ env.device }}-${{ github.run_id }}
           path: ${{steps.info.outputs.OutFolder}}/*.img
+
       - name: Upload Release
         uses: softprops/action-gh-release@v1
         with:
