@@ -98,9 +98,9 @@ jobs:
         run: |
           cd ${{env.WorkSpace}}
           source build/envsetup.sh
-          export MAINTAINER = "Github @RC1844"
-          export PB_TORCH_PATH = /sys/class/leds/flash-light0
-          export CODENAME = "begonia"
+          export MAINTAINER="Github @RC1844"
+          export PB_TORCH_PATH=/sys/class/leds/flash-light0
+          export CODENAME="begonia"
           lunch omni_${{ env.device }}-eng
           mka ${{env.target}}
         shell: bash
