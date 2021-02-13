@@ -112,7 +112,6 @@ jobs:
       - name: Show out tree
         run: |
           cd ${{steps.info.outputs.OutFolder}}
-          sudo zip -r9 recovery.zip recovery.img
           tree -C -L 5
       - name: Upload firmware directory
         uses: actions/upload-artifact@main
@@ -124,7 +123,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            ${{steps.info.outputs.OutFolder}}/recovery.zip
+            ${{steps.info.outputs.OutFolder}}/PBRP-begonia*.zip
             ${{steps.info.outputs.OutFolder}}/recovery.img
           name: ${{env.Rec_name}}-${{ env.device }}-${{ github.run_id }}
           tag_name: ${{ env.device }}-${{env.Rec_name}}-${{ steps.info.outputs.date }}
