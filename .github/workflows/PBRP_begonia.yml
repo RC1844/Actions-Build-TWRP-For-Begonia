@@ -100,9 +100,6 @@ jobs:
           source build/envsetup.sh
           export MAINTAINER="Github @RC1844"
           export PB_TORCH_PATH=/sys/class/flashlight/mt-flash-led1
-          export CODENAME="${{ env.device }}"
-          export VENDOR="redmi"
-          export BUILD_LUNCH="omni_${{ env.device }}-eng"
           export FLAVOR="eng"
           lunch omni_${{ env.device }}-eng
           mka ${{env.target}}
