@@ -71,6 +71,7 @@ jobs:
           cd ${{ env.DT_path }}
           sed -i 's/vendor\/omni/vendor\/pb/g' omni_begonia.mk
           cp -r recovery/root/system/etc/ recovery/root/etc/
+        # export PB_TORCH_PATH=/sys/class/flashlight/mt-flash-led1
 
       - name: Show tree
         run: tree -C -d -L 6
@@ -99,8 +100,6 @@ jobs:
           cd ${{env.WorkSpace}}
           source build/envsetup.sh
           export ALLOW_MISSING_DEPENDENCIES=true
-          export PB_TORCH_PATH=/sys/class/flashlight/mt-flash-led1
-          lunch omni_${{ env.device }}-eng
           mka ${{env.target}}
         shell: bash
 
