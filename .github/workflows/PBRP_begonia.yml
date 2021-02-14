@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@master
 
       - name: Delete old environment
-        if: env.Enable_cache == 'true' && !cancelled()
+        # if: env.Enable_cache == 'true' && !cancelled()
         run: |
           sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/apt/sources.list.d
           docker rmi `docker images -q`
