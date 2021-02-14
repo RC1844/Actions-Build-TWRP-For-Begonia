@@ -17,6 +17,7 @@
 ![REC Builder](../../workflows/TWRP%20Builder/badge.svg)
 ![TWRP Builder](../../workflows/REC%20Builder/badge.svg)
 ![OFOX Builder](../../workflows/OFOX%20Builder/badge.svg)
+![PBRP Builder](https://github.com/RC1844/Actions-Build-TWRP-For-Begonia/workflows/PBRP%20Builder/badge.svg)
 
 由于编译时间较长，建议把<code>[.github/workflows/actions_recovery.yml](.github/workflows/actions_recovery.yml)</code>末尾上传处的`${{ secrets.GITHUB_TOKEN }}`改成自己的[Personal Access Token](https://github.com/settings/tokens)
 

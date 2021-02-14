@@ -101,6 +101,7 @@ jobs:
           cd ${{env.WorkSpace}}
           source build/envsetup.sh
           export ALLOW_MISSING_DEPENDENCIES=true
+          lunch omni_${{ env.device }}-eng
           mka ${{env.target}}
         shell: bash
 
