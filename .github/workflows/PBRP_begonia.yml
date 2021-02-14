@@ -61,8 +61,8 @@ jobs:
         run: |
           mkdir WorkSpace
           cd WorkSpace
-          repo init -u ${{env.Rec_url}} --depth=1 --single-branch
-          repo sync -j4
+          repo init -u ${{env.Rec_url}} --depth=1 --platform=auto
+          repo sync -j4 --current-branch
 
       - name: Sync device tree
         run: |
