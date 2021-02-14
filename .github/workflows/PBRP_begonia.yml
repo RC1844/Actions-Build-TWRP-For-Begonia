@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@master
 
       - name: Delete old environment
-        # if: env.Enable_cache == 'true' && !cancelled()
+        if: env.Enable_cache == 'true' && !cancelled()
         run: |
           sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/apt/sources.list.d
           docker rmi `docker images -q`
@@ -61,7 +61,7 @@ jobs:
         run: |
           mkdir WorkSpace
           cd WorkSpace
-          repo init -u ${{env.Rec_url}} --depth=1 --groups=all,-notdefault,-device,-darwin,-x86,-mips
+          repo init -u ${{env.Rec_url}} --depth=1 --single-branch
           repo sync -j4
 
       - name: Sync device tree
@@ -71,6 +71,7 @@ jobs:
           cd ${{ env.DT_path }}
           sed -i 's/vendor\/omni/vendor\/pb/g' omni_begonia.mk
           cp -r recovery/root/system/etc/ recovery/root/etc/
+          tree -C -L 5
         # export PB_TORCH_PATH=/sys/class/flashlight/mt-flash-led1
 
       - name: Show tree
