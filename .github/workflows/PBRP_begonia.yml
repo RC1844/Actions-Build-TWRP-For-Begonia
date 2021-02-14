@@ -101,6 +101,9 @@ jobs:
           cd ${{env.WorkSpace}}
           source build/envsetup.sh
           export ALLOW_MISSING_DEPENDENCIES=true
+          export MAINTAINER="Github @RC1844"
+          export CODENAME="${{ env.device }}"
+          export VENDOR="redmi"
           lunch omni_${{ env.device }}-eng
           mka ${{env.target}}
         shell: bash
