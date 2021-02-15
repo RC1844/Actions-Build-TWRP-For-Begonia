@@ -73,6 +73,7 @@ jobs:
           mkdir recovery/root/etc
           cp -r recovery/root/system/etc/*.fstab recovery/root/etc/
           rm -rf recovery/root/system/etc/mke2fs.conf
+          rm -rf recovery/root/system/etc/ld.config.txt
           tree -C -L 5
         # export PB_TORCH_PATH=/sys/class/flashlight/mt-flash-led1
 
