@@ -70,6 +70,7 @@ jobs:
           git clone ${{ env.DT_url }} --depth=1 --single-branch ${{ env.DT_path }}
           cd ${{ env.DT_path }}
           sed -i 's/vendor\/omni/vendor\/pb/g' omni_begonia.mk
+          mkdir recovery/root/etc
           cp -r recovery/root/system/etc/*.fstab recovery/root/etc/
           tree -C -L 5
         # export PB_TORCH_PATH=/sys/class/flashlight/mt-flash-led1
