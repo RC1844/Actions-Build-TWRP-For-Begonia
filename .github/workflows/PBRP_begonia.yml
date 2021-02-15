@@ -72,6 +72,7 @@ jobs:
           sed -i 's/vendor\/omni/vendor\/pb/g' omni_begonia.mk
           mkdir recovery/root/etc
           cp -r recovery/root/system/etc/*.fstab recovery/root/etc/
+          rm -rf recovery/root/system/etc/mke2fs.conf
           tree -C -L 5
         # export PB_TORCH_PATH=/sys/class/flashlight/mt-flash-led1
 
