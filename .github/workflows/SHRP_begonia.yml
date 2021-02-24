@@ -69,9 +69,6 @@ jobs:
           cd ${{env.WorkSpace}}
           git clone ${{ env.DT_url }} --depth=1 --single-branch ${{ env.DT_path }}
           cd ${{ env.DT_path }}
-          rm -rf recovery/root/system/etc/mke2fs.conf
-          rm -rf recovery/root/system/etc/ld.config.txt
-          rm -rf recovery/root/prop.default
           rm -rf recovery/root/system/lib64
 
       - name: Show tree
