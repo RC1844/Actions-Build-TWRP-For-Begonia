@@ -20,7 +20,7 @@ env:
   Rec_ver: v3_10.0
   Rec_url: https://github.com/SHRP/platform_manifest_twrp_omni -b v3_10.0
   device: begonia
-  DT_url: https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0
+  DT_url: https://github.com/RC1844/twrp_redmi_begonia/commit/7a5b9b16f3ef36caeeabcb89e521c629d5792af6
   DT_path: device/redmi/begonia
   target: recoveryimage
   WorkSpace: WorkSpace
@@ -69,6 +69,9 @@ jobs:
           cd ${{env.WorkSpace}}
           git clone ${{ env.DT_url }} --depth=1 --single-branch ${{ env.DT_path }}
           cd ${{ env.DT_path }}
+          rm -rf recovery/root/system/etc/mke2fs.conf
+          rm -rf recovery/root/system/etc/ld.config.txt
+          rm -rf recovery/root/prop.default
           rm -rf recovery/root/system/lib64
 
       - name: Show tree
