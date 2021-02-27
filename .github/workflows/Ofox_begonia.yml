@@ -112,13 +112,16 @@ jobs:
         # if: steps.organize.outputs.status == 'success' && !cancelled()
         with:
           name: ${{env.Rec_name}}_for_${{ env.device }}-${{ github.run_id }}
-          path: ${{steps.info.outputs.OutFolder}}/OrangeFox-Unofficial-${{ env.device }}*
+          path: |
+            ${{steps.info.outputs.OutFolder}}/OrangeFox-Unofficial-${{ env.device }}*
+            ${{steps.info.outputs.OutFolder}}/recovery.img
 
       - name: Upload Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             ${{steps.info.outputs.OutFolder}}/OrangeFox-Unofficial-${{ env.device }}*
+            ${{steps.info.outputs.OutFolder}}/recovery.img
           name: ${{env.Rec_name}}-${{ env.device }}-${{ github.run_id }}
           tag_name: ${{ env.device }}-${{env.Rec_name}}-${{ steps.info.outputs.date }}
           body: ${{env.Rec_name}}-${{env.Rec_ver}} for ${{ env.device }} build at ${{ steps.info.outputs.date }}
