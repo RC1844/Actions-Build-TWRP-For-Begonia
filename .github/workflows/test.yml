@@ -2,8 +2,8 @@ name: Test Build
 on:
   push:
   workflow_dispatch:
-  watch:
-    types: [started]
+  # watch:
+  #   types: [started]
 
 jobs:
   build:
@@ -20,7 +20,7 @@ jobs:
           KERNELISPREBUILT: "true"
           TARGET: "recoveryimage"
           FLAVOR: "eng"
-          EXTRA_CMD: "tree -C -d -L 4 \n rm -rf work/device/redmi/begonia/recovery/root/system/lib64"
+          EXTRA_CMD: "rm -rf device/redmi/begonia/recovery/root/system/lib64"
           TZ: "Asia/Shanghai"
 
       - name: Release Builds
