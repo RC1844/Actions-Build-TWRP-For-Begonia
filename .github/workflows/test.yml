@@ -1,0 +1,34 @@
+name: Test Build
+on:
+  push:
+  workflow_dispatch:
+  watch:
+    types: [started]
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Recovery Compilation
+        uses: Carbonatedblack/Recovery-Compiler@production
+        env:
+          MANIFEST: "https://github.com/SHRP/platform_manifest_twrp_omni -b v3_10.0"
+          DT_LINK: "https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0"
+          VENDOR: "redmi"
+          CODENAME: "begonia"
+          KERNELISPREBUILT: "true"
+          TARGET: "recoveryimage"
+          FLAVOR: "eng"
+          TZ: "Asia/Shanghai"
+
+      - name: Release Builds
+        uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "latest"
+          prerelease: false
+          title: "CI"
+          files: |
+            work/out/target/product/*/*.zip
+            work/out/target/product/*/*.img
