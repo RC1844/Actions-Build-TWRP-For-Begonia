@@ -67,12 +67,10 @@ jobs:
       - name: Sync device tree
         run: |
           cd ${{env.WorkSpace}}
-          git clone ${{ env.DT_url }} --single-branch ${{ env.DT_path }}
+          git clone ${{ env.DT_url }} --depth=1 --single-branch ${{ env.DT_path }}
           cd ${{ env.DT_path }}
-          git checkout 7a5b9b16f3ef36caeeabcb89e521c629d5792af6
-          rm -rf recovery/root/system/etc/mke2fs.conf
-          rm -rf recovery/root/system/etc/ld.config.txt
-          rm -rf recovery/root/prop.default
+          sed -i 's/TW_INCLUDE_CRYPTO := false/TW_INCLUDE_CRYPTO := true/g' BoardConfig.mk
+          sed -i 's/TW_INCLUDE_CRYPTO_FBE := false/TW_INCLUDE_CRYPTO_FBE := true/g' BoardConfig.mk
           rm -rf recovery/root/system/lib64
 
       - name: Show tree
