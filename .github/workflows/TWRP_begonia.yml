@@ -26,7 +26,7 @@ env:
   WorkSpace: WorkSpace
   TZ: Asia/Shanghai
   Enable_cache: false
-  Enable_ccache: false
+  Enable_ccache: true
   Delete_old: false
 
 jobs:
@@ -68,6 +68,10 @@ jobs:
         run: |
           cd ${{env.WorkSpace}}
           git clone ${{ env.DT_url }} --depth=1 --single-branch ${{ env.DT_path }}
+          cd ${{ env.DT_path }}
+          sed -i 's/TW_INCLUDE_CRYPTO := false/TW_INCLUDE_CRYPTO := true/g' BoardConfig.mk
+          sed -i 's/TW_INCLUDE_CRYPTO_FBE := false/TW_INCLUDE_CRYPTO_FBE := true/g' BoardConfig.mk
+          rm -rf recovery/root/system/lib64
 
       - name: Show tree
         run: tree -C -d -L 6
