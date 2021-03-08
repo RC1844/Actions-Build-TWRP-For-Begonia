@@ -26,7 +26,7 @@ env:
   WorkSpace: WorkSpace
   TZ: Asia/Shanghai
   Enable_cache: false
-  Enable_ccache: false
+  Enable_ccache: true
   Delete_old: false
 
 jobs:
