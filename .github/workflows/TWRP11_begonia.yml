@@ -71,6 +71,7 @@ jobs:
           cd ${{ env.DT_path }}
           sed -i 's/TW_INCLUDE_CRYPTO := false/TW_INCLUDE_CRYPTO := true/g' BoardConfig.mk
           sed -i 's/TW_INCLUDE_CRYPTO_FBE := false/TW_INCLUDE_CRYPTO_FBE := true/g' BoardConfig.mk
+          sed -i 's/vendor\/omni/vendor\/twrp/g' omni_begonia.mk
           rm -rf recovery/root/system/lib64
 
       - name: Show tree
