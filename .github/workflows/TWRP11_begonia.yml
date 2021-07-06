@@ -137,6 +137,40 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: build 2
+        run: |
+          cd ${{ env.DT_path }}
+                  sed -i 's/TW_INCLUDE_CRYPTO := false/TW_INCLUDE_CRYPTO := true/g' BoardConfig.mk
+                  sed -i 's/TW_INCLUDE_CRYPTO_FBE := false/TW_INCLUDE_CRYPTO_FBE := true/g' BoardConfig.mk
+
+      - name: Building ${{env.Rec_name}}
+        run: |
+          cd ${{env.WorkSpace}}
+          source build/envsetup.sh
+          export ALLOW_MISSING_DEPENDENCIES=true
+          lunch omni_${{ env.device }}-eng
+          mka ${{env.target}}
+        shell: bash
+
+      - name: Upload firmware directory
+        uses: actions/upload-artifact@main
+        # if: steps.organize.outputs.status == 'success' && !cancelled()
+        with:
+          name: ${{env.Rec_name}}_for_${{ env.device }}-${{ github.run_id } 2}
+          path: ${{steps.info.outputs.OutFolder}}/*.img
+
+      - name: Upload Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ${{steps.info.outputs.OutFolder}}/recovery.zip
+            ${{steps.info.outputs.OutFolder}}/recovery.img
+          name: ${{env.Rec_name}}-${{ env.device }}-${{ github.run_id } 2}
+          tag_name: ${{ env.device }}-${{env.Rec_name}}-${{ steps.info.outputs.date } 2}
+          body: ${{env.Rec_name}}-${{env.Rec_ver}} for ${{ env.device }} build at ${{ steps.info.outputs.date }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Remove old Releases
         uses: dev-drprasad/delete-older-releases@v0.1.0
         if: env.Delete_old == 'true' && !cancelled()
