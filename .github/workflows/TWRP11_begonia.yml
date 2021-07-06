@@ -18,7 +18,7 @@ on:
 env:
   Rec_name: TWRP
   Rec_ver: 3.5.0
-  Rec_url: git://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git -b twrp-11
+  Rec_url: https://github.com/RC1844/platform_manifest_twrp_omni -b twrp11-aosp
   device: begonia
   DT_url: https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0
   DT_path: device/redmi/begonia
