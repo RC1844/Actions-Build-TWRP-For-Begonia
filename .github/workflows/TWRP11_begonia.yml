@@ -18,7 +18,7 @@ on:
 env:
   Rec_name: TWRP
   Rec_ver: 3.5.0
-  Rec_url:  https://github.com/RC1844/platform_manifest_twrp_omni -b twrp11-aosp
+  Rec_url: https://github.com/RC1844/platform_manifest_twrp_omni -b twrp11-aosp
   device: begonia
   DT_url: https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0
   DT_path: device/redmi/begonia
@@ -143,7 +143,7 @@ jobs:
           sed -i 's/TW_INCLUDE_CRYPTO := false/TW_INCLUDE_CRYPTO := true/g' BoardConfig.mk
           sed -i 's/TW_INCLUDE_CRYPTO_FBE := false/TW_INCLUDE_CRYPTO_FBE := true/g' BoardConfig.mk
 
-      - name: Building ${{env.Rec_name}}
+      - name: Building ${{env.Rec_name}}-2
         run: |
           cd ${{env.WorkSpace}}
           source build/envsetup.sh
@@ -156,17 +156,17 @@ jobs:
         uses: actions/upload-artifact@main
         # if: steps.organize.outputs.status == 'success' && !cancelled()
         with:
-          name: ${{env.Rec_name}}_for_${{ env.device }}-${{ github.run_id }-2}
+          name: ${{env.Rec_name}}_for2_${{env.device}}-${{github.run_id}}-2
           path: ${{steps.info.outputs.OutFolder}}/*.img
 
-      - name: Upload Release
+      - name: Upload Release2
         uses: softprops/action-gh-release@v1
         with:
           files: |
             ${{steps.info.outputs.OutFolder}}/recovery.zip
             ${{steps.info.outputs.OutFolder}}/recovery.img
-          name: ${{env.Rec_name}}-${{ env.device }}-${{ github.run_id }-2}
-          tag_name: ${{ env.device }}-${{env.Rec_name}}-${{ steps.info.outputs.date }-2}
+          name: ${{env.Rec_name}}-${{env.device}}-${{github.run_id}}-2
+          tag_name: ${{ env.device }}-${{env.Rec_name}}-${{ steps.info.outputs.date }}-2
           body: ${{env.Rec_name}}-${{env.Rec_ver}} for ${{ env.device }} build at ${{ steps.info.outputs.date }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
