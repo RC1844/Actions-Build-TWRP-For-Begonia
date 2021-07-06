@@ -152,7 +152,7 @@ jobs:
           mka ${{env.target}}
         shell: bash
 
-      - name: Upload firmware directory
+      - name: Upload firmware directory2
         uses: actions/upload-artifact@main
         # if: steps.organize.outputs.status == 'success' && !cancelled()
         with:
@@ -166,7 +166,7 @@ jobs:
             ${{steps.info.outputs.OutFolder}}/recovery.zip
             ${{steps.info.outputs.OutFolder}}/recovery.img
           name: ${{env.Rec_name}}-${{ env.device }}-${{ github.run_id }-2}
-          tag_name: ${{ env.device }}-${{env.Rec_name}}-${{ steps.info.outputs.date } 2}
+          tag_name: ${{ env.device }}-${{env.Rec_name}}-${{ steps.info.outputs.date }-2}
           body: ${{env.Rec_name}}-${{env.Rec_ver}} for ${{ env.device }} build at ${{ steps.info.outputs.date }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
