@@ -140,8 +140,8 @@ jobs:
       - name: build 2
         run: |
           cd ${{ env.DT_path }}
-                  sed -i 's/TW_INCLUDE_CRYPTO := false/TW_INCLUDE_CRYPTO := true/g' BoardConfig.mk
-                  sed -i 's/TW_INCLUDE_CRYPTO_FBE := false/TW_INCLUDE_CRYPTO_FBE := true/g' BoardConfig.mk
+          sed -i 's/TW_INCLUDE_CRYPTO := false/TW_INCLUDE_CRYPTO := true/g' BoardConfig.mk
+          sed -i 's/TW_INCLUDE_CRYPTO_FBE := false/TW_INCLUDE_CRYPTO_FBE := true/g' BoardConfig.mk
 
       - name: Building ${{env.Rec_name}}
         run: |
@@ -156,7 +156,7 @@ jobs:
         uses: actions/upload-artifact@main
         # if: steps.organize.outputs.status == 'success' && !cancelled()
         with:
-          name: ${{env.Rec_name}}_for_${{ env.device }}-${{ github.run_id } 2}
+          name: ${{env.Rec_name}}_for_${{ env.device }}-${{ github.run_id }-2}
           path: ${{steps.info.outputs.OutFolder}}/*.img
 
       - name: Upload Release
@@ -165,7 +165,7 @@ jobs:
           files: |
             ${{steps.info.outputs.OutFolder}}/recovery.zip
             ${{steps.info.outputs.OutFolder}}/recovery.img
-          name: ${{env.Rec_name}}-${{ env.device }}-${{ github.run_id } 2}
+          name: ${{env.Rec_name}}-${{ env.device }}-${{ github.run_id }-2}
           tag_name: ${{ env.device }}-${{env.Rec_name}}-${{ steps.info.outputs.date } 2}
           body: ${{env.Rec_name}}-${{env.Rec_ver}} for ${{ env.device }} build at ${{ steps.info.outputs.date }}
         env:
