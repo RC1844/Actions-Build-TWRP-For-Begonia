@@ -63,10 +63,10 @@ jobs:
           cd WorkSpace
           repo init -u ${{env.Rec_url}} --depth=1 --groups=all,-notdefault,-device,-darwin,-x86,-mips
           repo sync -j4
-          \cp -r vendor/twrp/dummy/Android.mk frameworks/base/core/xsd/vts/Android.mk
-          \cp -r vendor/twrp/dummy/Android.mk frameworks/base/services/core/xsd/vts/Android.mk
-          \cp -r vendor/twrp/dummy/Android.mk system/libvintf/xsd/compatibilityMatrix/vts/Android.mk
-          \cp -r vendor/twrp/dummy/Android.mk system/libvintf/xsd/halManifest/vts/Android.mk
+          sudo \cp -r vendor/twrp/dummy/Android.mk frameworks/base/core/xsd/vts/Android.mk
+          sudo \cp -r vendor/twrp/dummy/Android.mk frameworks/base/services/core/xsd/vts/Android.mk
+          sudo \cp -r vendor/twrp/dummy/Android.mk system/libvintf/xsd/compatibilityMatrix/vts/Android.mk
+          sudo \cp -r vendor/twrp/dummy/Android.mk system/libvintf/xsd/halManifest/vts/Android.mk
 
       - name: Sync device tree
         run: |
