@@ -18,7 +18,7 @@ on:
 env:
   Rec_name: TWRP
   Rec_ver: 3.5.0
-  Rec_url: https://github.com/RC1844/platform_manifest_twrp_omni -b twrp11-aosp
+  Rec_url: https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp -b twrp-11
   device: begonia
   DT_url: https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0
   DT_path: device/redmi/begonia
@@ -63,6 +63,10 @@ jobs:
           cd WorkSpace
           repo init -u ${{env.Rec_url}} --depth=1 --groups=all,-notdefault,-device,-darwin,-x86,-mips
           repo sync -j4
+          \cp -r vendor/twrp/dummy/Android.mk frameworks/base/core/xsd/vts/Android.mk
+          \cp -r vendor/twrp/dummy/Android.mk frameworks/base/services/core/xsd/vts/Android.mk
+          \cp -r vendor/twrp/dummy/Android.mk system/libvintf/xsd/compatibilityMatrix/vts/Android.mk
+          \cp -r vendor/twrp/dummy/Android.mk system/libvintf/xsd/halManifest/vts/Android.mk
 
       - name: Sync device tree
         run: |
