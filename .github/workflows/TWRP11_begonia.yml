@@ -16,8 +16,8 @@ on:
   #   types: [started]
 
 env:
-  Rec_name: TWRP
-  Rec_ver: 3.5.0
+  Rec_name: TWRP11
+  Rec_ver: 3.5.2
   Rec_url: https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp -b twrp-11
   device: begonia
   DT_url: https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0
@@ -25,6 +25,7 @@ env:
   target: recoveryimage
   WorkSpace: WorkSpace
   TZ: Asia/Shanghai
+  Author: RC1844
   Enable_cache: false
   Enable_ccache: true
   Delete_old: false
@@ -120,7 +121,7 @@ jobs:
       - name: Show out tree
         run: |
           cd ${{steps.info.outputs.OutFolder}}
-          sudo zip -r9 recovery.zip recovery.img
+          sudo zip -r9 ${{env.Rec_name}}_for_${{ env.device }}_by_${{ env.Author }}.zip recovery.img
           tree -C -L 5
 
       - name: Upload firmware directory
@@ -134,7 +135,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            ${{steps.info.outputs.OutFolder}}/recovery.zip
+            ${{steps.info.outputs.OutFolder}}/${{env.Rec_name}}_for_${{ env.device }}_by_${{ env.Author }}.zip
             ${{steps.info.outputs.OutFolder}}/recovery.img
           name: ${{env.Rec_name}}-${{ env.device }}-${{ github.run_id }}
           tag_name: ${{ env.device }}-${{env.Rec_name}}-${{ steps.info.outputs.date }}
@@ -144,7 +145,7 @@ jobs:
 
       - name: build 2
         run: |
-          cd ${{ env.DT_path }}
+          cd ${{env.WorkSpace}}/${{ env.DT_path }}
           sed -i 's/TW_INCLUDE_CRYPTO := false/TW_INCLUDE_CRYPTO := true/g' BoardConfig.mk
           sed -i 's/TW_INCLUDE_CRYPTO_FBE := false/TW_INCLUDE_CRYPTO_FBE := true/g' BoardConfig.mk
 
@@ -157,6 +158,11 @@ jobs:
           mka ${{env.target}}
         shell: bash
 
+      - name: Show out tree
+        run: |
+          cd ${{steps.info.outputs.OutFolder}}
+          sudo zip -r9 ${{env.Rec_name}}_for_${{ env.device }}_by_${{ env.Author }}.zip recovery.img
+
       - name: Upload firmware directory2
         uses: actions/upload-artifact@main
         # if: steps.organize.outputs.status == 'success' && !cancelled()
@@ -168,7 +174,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            ${{steps.info.outputs.OutFolder}}/recovery.zip
+            ${{steps.info.outputs.OutFolder}}/${{env.Rec_name}}_for_${{ env.device }}_by_${{ env.Author }}.zip
             ${{steps.info.outputs.OutFolder}}/recovery.img
           name: ${{env.Rec_name}}-${{env.device}}-${{github.run_id}}-2
           tag_name: ${{ env.device }}-${{env.Rec_name}}-${{ steps.info.outputs.date }}-2
