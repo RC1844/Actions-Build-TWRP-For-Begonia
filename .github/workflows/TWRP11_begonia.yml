@@ -73,7 +73,7 @@ jobs:
           sed -i 's/TW_INCLUDE_CRYPTO := false/TW_INCLUDE_CRYPTO := true/g' BoardConfig.mk
           sed -i 's/TW_INCLUDE_CRYPTO_FBE := false/TW_INCLUDE_CRYPTO_FBE := true/g' BoardConfig.mk
           sed -i 's/vendor\/omni/vendor\/twrp/g' omni_begonia.mk
-          rm -rf recovery/root/system/lib64
+          rm -rf recovery/root/*
 
       - name: Show tree
         run: tree -C -d -L 6
