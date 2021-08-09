@@ -12,6 +12,11 @@ on:
   #    - cron: 0 8 * * 5
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+    inputs:
+      crypto:
+        description: "是否禁用加密模块，true or false"
+        required: false
+        default: "false"
   # watch:
   #   types: [started]
 
@@ -70,10 +75,15 @@ jobs:
           cd ${{env.WorkSpace}}
           git clone ${{ env.DT_url }} --depth=1 --single-branch ${{ env.DT_path }}
           cd ${{ env.DT_path }}
-          sed -i 's/TW_INCLUDE_CRYPTO := false/TW_INCLUDE_CRYPTO := true/g' BoardConfig.mk
-          sed -i 's/TW_INCLUDE_CRYPTO_FBE := false/TW_INCLUDE_CRYPTO_FBE := true/g' BoardConfig.mk
-          sed -i 's/vendor\/omni/vendor\/twrp/g' omni_begonia.mk
+          sed -i 's/vendor\/omni/vendor\/twrp/g' omni_${{ env.device }}.mk
           rm -rf recovery/root/*
+
+      - name: Disable Crypto
+        if: (github.event.inputs.crypto == 'true' && github.event.inputs.crypto  != 'false') || contains(github.event.action, 'crypto')
+        run: |
+          cd ${{env.WorkSpace}}/${{ env.DT_path }}
+          sed -i 's/TW_INCLUDE_CRYPTO := true/TW_INCLUDE_CRYPTO := false/g' BoardConfig.mk
+          sed -i 's/TW_INCLUDE_CRYPTO_FBE := true/TW_INCLUDE_CRYPTO_FBE := false/g' BoardConfig.mk
 
       - name: Show tree
         run: tree -C -d -L 6
@@ -85,7 +95,7 @@ jobs:
           path: |
             ~/.ccache
             ${{env.WorkSpace}}/out
-          key: ${{ runner.os }}-${{env.Rec_name}}-${{env.Rec_ver}}-${{ env.device }} #${{ hashFiles('**/BoardConfig.mk') }}
+          key: ${{ runner.os }}-${{env.Rec_name}}-${{env.Rec_ver}}-${{ env.device }}
           restore-keys: |
             ${{ runner.os }}-${{env.Rec_name}}-${{env.Rec_ver}}-${{ env.device }}
 

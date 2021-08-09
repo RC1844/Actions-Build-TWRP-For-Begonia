@@ -1,6 +1,11 @@
 name: OFOX Builder
-
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      crypto:
+        description: "是否禁用加密模块，true or false"
+        required: false
+        default: "false"
 
 env:
   Rec_name: Ofox
@@ -12,6 +17,7 @@ env:
   target: recoveryimage
   WorkSpace: WorkSpace
   TZ: Asia/Shanghai
+  Author: RC1844
   Enable_cache: false
   Enable_ccache: true
   Delete_old: false
@@ -58,7 +64,15 @@ jobs:
         run: |
           cd ${{env.WorkSpace}}
           git clone ${{ env.DT_url }} --depth=1 --single-branch ${{ env.DT_path }}
-          rm -r device/redmi/begonia/recovery/root/system/lib64
+          cd ${{ env.DT_path }}
+          rm -r recovery/root/system/lib64
+
+      - name: Disable Crypto
+        if: (github.event.inputs.crypto == 'true' && github.event.inputs.crypto  != 'false') || contains(github.event.action, 'crypto')
+        run: |
+          cd ${{env.WorkSpace}}/${{ env.DT_path }}
+          sed -i 's/TW_INCLUDE_CRYPTO := true/TW_INCLUDE_CRYPTO := false/g' BoardConfig.mk
+          sed -i 's/TW_INCLUDE_CRYPTO_FBE := true/TW_INCLUDE_CRYPTO_FBE := false/g' BoardConfig.mk
 
       - name: Show tree
         run: tree -C -d -L 6
@@ -69,7 +83,7 @@ jobs:
           path: |
             ~/.ccache
             ${{env.WorkSpace}}/out
-          key: ${{ runner.os }}-${{env.Rec_name}}-${{env.Rec_ver}}-${{ env.device }} #${{ hashFiles('**/BoardConfig.mk') }}
+          key: ${{ runner.os }}-${{env.Rec_name}}-${{env.Rec_ver}}-${{ env.device }}
           restore-keys: |
             ${{ runner.os }}-${{env.Rec_name}}-${{env.Rec_ver}}-${{ env.device }}
 
@@ -92,6 +106,7 @@ jobs:
           export FOX_VERSION="Unofficial"
           export OF_SCREEN_H=2160
           lunch omni_${{ env.device }}-eng
+          repo sync -j4
           mka ${{env.target}}
         shell: bash
 
@@ -105,6 +120,7 @@ jobs:
       - name: Show out tree
         run: |
           cd ${{steps.info.outputs.OutFolder}}
+          sudo zip -r9 ${{env.Rec_name}}_for_${{ env.device }}_by_${{ env.Author }}.zip recovery.img
           tree -C -L 5
 
       - name: Upload firmware directory
@@ -112,19 +128,19 @@ jobs:
         # if: steps.organize.outputs.status == 'success' && !cancelled()
         with:
           name: ${{env.Rec_name}}_for_${{ env.device }}-${{ github.run_id }}
-          path: |
-            ${{steps.info.outputs.OutFolder}}/OrangeFox-Unofficial-${{ env.device }}*
-            ${{steps.info.outputs.OutFolder}}/recovery.img
+          path: ${{steps.info.outputs.OutFolder}}/*.img
 
       - name: Upload Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            ${{steps.info.outputs.OutFolder}}/OrangeFox-Unofficial-${{ env.device }}*
+            ${{steps.info.outputs.OutFolder}}/${{env.Rec_name}}_for_${{ env.device }}_by_${{ env.Author }}.zip
             ${{steps.info.outputs.OutFolder}}/recovery.img
           name: ${{env.Rec_name}}-${{ env.device }}-${{ github.run_id }}
           tag_name: ${{ env.device }}-${{env.Rec_name}}-${{ steps.info.outputs.date }}
-          body: ${{env.Rec_name}}-${{env.Rec_ver}} for ${{ env.device }} build at ${{ steps.info.outputs.date }}
+          body: |
+            ${{env.Rec_name}}-${{env.Rec_ver}} for ${{ env.device }} build at ${{ steps.info.outputs.date }}
+            Download link :https://download.fastgit.org/RC1844/Actions-Build-TWRP-For-Begonia/releases/download/${{ env.device }}-${{env.Rec_name}}-${{ steps.info.outputs.date }}/${{steps.info.outputs.OutFolder}}/${{env.Rec_name}}_for_${{ env.device }}_by_${{ env.Author }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
