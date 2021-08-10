@@ -76,7 +76,6 @@ jobs:
           git clone ${{ env.DT_url }} --depth=1 --single-branch ${{ env.DT_path }}
           cd ${{ env.DT_path }}
           sed -i 's/vendor\/omni/vendor\/twrp/g' omni_${{ env.device }}.mk
-          rm -rf recovery/root/*
 
       - name: Disable Crypto
         if: (github.event.inputs.crypto == 'true' && github.event.inputs.crypto  != 'false') || contains(github.event.action, 'crypto')
@@ -127,7 +126,7 @@ jobs:
       - name: Show out tree
         run: |
           cd ${{steps.info.outputs.OutFolder}}
-          sudo zip -r9 ${{env.Rec_name}}_for_${{ env.device }}_by_${{ env.Author }}.zip *.img
+          sudo zip -r9 ${{env.Rec_name}}_for_${{ env.device }}_by_${{ env.Author }}.zip recovery.img
           tree -C -L 5
 
       - name: Upload firmware directory
