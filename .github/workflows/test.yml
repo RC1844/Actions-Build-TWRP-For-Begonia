@@ -10,26 +10,33 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
-      - name: Recovery Compilation
-        uses: Carbonatedblack/Recovery-Compiler@production
-        env:
-          MANIFEST: "https://github.com/SHRP/platform_manifest_twrp_omni -b v3_10.0"
-          DT_LINK: "https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0"
-          VENDOR: "redmi"
-          CODENAME: "begonia"
-          KERNELISPREBUILT: "true"
-          TARGET: "recoveryimage"
-          FLAVOR: "eng"
-          EXTRA_CMD: "rm -rf device/redmi/begonia/recovery/root/system/lib64"
-          TZ: "Asia/Shanghai"
+      # - name: Recovery Compilation
+      #   uses: Carbonatedblack/Recovery-Compiler@production
+      #   env:
+      #     MANIFEST: "https://github.com/SHRP/platform_manifest_twrp_omni -b v3_10.0"
+      #     DT_LINK: "https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0"
+      #     VENDOR: "redmi"
+      #     CODENAME: "begonia"
+      #     KERNELISPREBUILT: "true"
+      #     TARGET: "recoveryimage"
+      #     FLAVOR: "eng"
+      #     EXTRA_CMD: "rm -rf device/redmi/begonia/recovery/root/system/lib64"
+      #     TZ: "Asia/Shanghai"
 
-      - name: Release Builds
-        uses: "marvinpinto/action-automatic-releases@latest"
+      # - name: Release Builds
+      #   uses: "marvinpinto/action-automatic-releases@latest"
+      #   with:
+      #     repo_token: "${{ secrets.GITHUB_TOKEN }}"
+      #     automatic_release_tag: "latest"
+      #     prerelease: false
+      #     title: "CI"
+      #     files: |
+      #       work/out/target/product/*/*.zip
+      #       work/out/target/product/*/*.img
+      - name: Upload Release
+        uses: softprops/action-gh-release@master
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "latest"
-          prerelease: false
-          title: "CI"
-          files: |
-            work/out/target/product/*/*.zip
-            work/out/target/product/*/*.img
+          name: 4444
+          tag_name: 4444
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
