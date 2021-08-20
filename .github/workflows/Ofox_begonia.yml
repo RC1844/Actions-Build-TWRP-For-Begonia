@@ -51,8 +51,8 @@ jobs:
 
       - name: Sync recovery source
         run: |
-          mkdir WorkSpace
-          cd WorkSpace
+          mkdir ${{env.WorkSpace}}
+          cd ${{env.WorkSpace}}
           repo init -u ${{env.Rec_url}} --depth=1 --groups=all,-notdefault,-device,-darwin,-x86,-mips
           repo sync -j4
         # git clone https://gitlab.com/OrangeFox/sync.git --depth=1 --single-branch
@@ -131,16 +131,16 @@ jobs:
           path: ${{steps.info.outputs.OutFolder}}/*.img
 
       - name: Upload Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@master
         with:
           files: |
             ${{steps.info.outputs.OutFolder}}/${{env.Rec_name}}_for_${{ env.device }}_by_${{ env.Author }}.zip
-            ${{steps.info.outputs.OutFolder}}/recovery.img
+            ${{steps.info.outputs.OutFolder}}/*.img
           name: ${{env.Rec_name}}-${{ env.device }}-${{ github.run_id }}
           tag_name: ${{ env.device }}-${{env.Rec_name}}-${{ steps.info.outputs.date }}
           body: |
             ${{env.Rec_name}}-${{env.Rec_ver}} for ${{ env.device }} build at ${{ steps.info.outputs.date }}
-            Download link :https://download.fastgit.org/RC1844/Actions-Build-TWRP-For-Begonia/releases/download/${{ env.device }}-${{env.Rec_name}}-${{ steps.info.outputs.date }}/${{steps.info.outputs.OutFolder}}/${{env.Rec_name}}_for_${{ env.device }}_by_${{ env.Author }}.zip
+            Download link :https://download.fastgit.org/RC1844/Actions-Build-TWRP-For-Begonia/releases/download/${{ env.device }}-${{env.Rec_name}}-${{ steps.info.outputs.date }}/${{env.Rec_name}}_for_${{ env.device }}_by_${{ env.Author }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
