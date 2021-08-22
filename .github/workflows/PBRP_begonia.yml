@@ -23,7 +23,7 @@ on:
 env:
   Rec_name: PBRP
   Rec_ver: 3.0.0
-  Rec_url: git://github.com/PitchBlackRecoveryProject/manifest_pb.git -b android-10.0
+  Rec_url: https://github.com/PitchBlackRecoveryProject/manifest_pb.git -b android-10.0
   device: begonia
   DT_url: https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0
   DT_path: device/redmi/begonia
