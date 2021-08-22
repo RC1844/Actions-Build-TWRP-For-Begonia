@@ -1,4 +1,4 @@
-name: SHRP Builder
+name: SHRP11 Builder
 
 on:
   #  release:
@@ -74,6 +74,8 @@ jobs:
         run: |
           cd ${{env.WorkSpace}}
           git clone ${{ env.DT_url }} --depth=1 --single-branch ${{ env.DT_path }}
+          cd ${{ env.DT_path }}
+          sed -i 's/vendor\/omni/vendor\/twrp/g' omni_${{ env.device }}.mk
 
       - name: Disable Crypto
         if: (github.event.inputs.crypto == 'true' && github.event.inputs.crypto  != 'false') || contains(github.event.action, 'crypto')
