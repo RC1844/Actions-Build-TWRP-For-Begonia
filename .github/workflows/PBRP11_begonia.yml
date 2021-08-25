@@ -43,6 +43,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@master
 
+      - uses: rokibhasansagar/slimhub_actions@main
+
       - name: Delete old environment
         # if: env.Enable_cache == 'true' && !cancelled()
         run: |
