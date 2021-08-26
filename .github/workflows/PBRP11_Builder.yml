@@ -1,0 +1,100 @@
+name: PBRP11 Builder2
+
+on:
+  workflow_dispatch:
+    inputs:
+      crypto:
+        description: "是否禁用加密模块\ntrue or false"
+        required: false
+        default: "false"
+      deleteReleases:
+        description: "是否删除旧的Releases\ntrue or false"
+        required: false
+        default: "false"
+      deleteWorkflow:
+        description: "是否删除旧的workflow\ntrue or false"
+        required: false
+        default: "false"
+
+env:
+  MANIFEST: "https://github.com/PitchBlackRecoveryProject/manifest_pb.git -b android-11.0" # or "orangefox10" for Orangefox Android v10
+  DT_LINK: "https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0"
+  VENDOR: "Redmi" # Example: xiaomi, samsung, asus, etc.
+  CODENAME: "begonia" # Example: nikel, phoenix, ginkgo, etc.
+  KERNEL_LINK: "" # Only for building kernel from source. Ignore if using prebuilt.
+  TARGET: "recoveryimage"
+  FLAVOR: "eng"
+  EXTRA_CMD: "sed -i 's/vendor\/omni/vendor\/pb/g' omni_begonia.mk"
+  TZ: "Asia/Shanghai" # Set Time-Zone According To Your Region
+  WorkSpace: WorkSpace
+  Rec_name: PBRP11
+  Rec_ver: 3.1.0
+jobs:
+  recovery_builder:
+    runs-on: ubuntu-latest
+    # You can use either of the ubuntu-18.04 or ubuntu-20.04 runner
+    steps:
+      # Checking out the repo is not mandatory, so don't
+      #- uses: actions/checkout@v2
+      # Cleanup The Actions Workspace Using Custom Composite Run Actions
+      - name: "Cleanup Environment"
+        uses: rokibhasansagar/slimhub_actions@main
+      # That's it! Now use this action
+      # - name: Disable Crypto
+      #   if: (github.event.inputs.crypto == 'true' && github.event.inputs.crypto  != 'false') || contains(github.event.action, 'crypto')
+      #   run: |
+      #     cd ${{env.WorkSpace}}/${{ env.DT_path }}
+      #     sed -i 's/TW_INCLUDE_CRYPTO := true/TW_INCLUDE_CRYPTO := false/g' BoardConfig.mk
+      #     sed -i 's/TW_INCLUDE_CRYPTO_FBE := true/TW_INCLUDE_CRYPTO_FBE := false/g' BoardConfig.mk
+
+      - name: Android Recovery Compiler For Github Actions
+        uses: ElytrA8/Recovery-Compiler@V3
+
+      - name: Get info
+        id: info
+        run: |
+          echo "::set-output name=date::$(/bin/date -u "+%Y-%m-%d-%H-%M")"
+          echo "::set-output name=OutFolder::"${BuildPath}/out/target/product/${CODENAME}""
+        shell: bash
+
+      - name: Upload firmware directory
+        uses: actions/upload-artifact@main
+        # if: steps.organize.outputs.status == 'success' && !cancelled()
+        with:
+          name: ${{env.Rec_name}}_for_${{ env.CODENAME }}-${{ github.run_id }}
+          path: ${{steps.info.outputs.OutFolder}}/*{.img,.zip}
+
+      - name: Show out tree
+        run: |
+          cd ${{steps.info.outputs.OutFolder}}
+          sudo zip -r9 ${{env.Rec_name}}_for_${{ env.device }}_by_${{ env.Author }}.zip recovery.img
+          tree -C -L 5
+
+      - name: Upload Release
+        uses: softprops/action-gh-release@master
+        with:
+          files: |
+            ${{steps.info.outputs.OutFolder}}/*{.img,.zip}
+          name: ${{env.Rec_name}}-${{ env.CODENAME }}-${{ github.run_id }}
+          tag_name: ${{ env.CODENAME }}-${{env.Rec_name}}-${{ steps.info.outputs.date }}
+          body: |
+            ${{env.Rec_name}}-${{env.Rec_ver}} for ${{ env.CODENAME }} build at ${{ steps.info.outputs.date }}
+            Download link :https://download.fastgit.org/RC1844/Actions-Build-TWRP-For-Begonia/releases/download/${{ env.CODENAME }}-${{env.Rec_name}}-${{ steps.info.outputs.date }}/${{env.Rec_name}}_for_${{ env.CODENAME }}_by_${{ env.Author }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Remove old Releases
+        uses: dev-drprasad/delete-older-releases@v0.1.0
+        if: (github.event.inputs.deleteReleases == 'true' && github.event.inputs.deleteReleases  != 'false') || contains(github.event.action, 'deleteReleases')
+        with:
+          keep_latest: 12
+          delete_tags: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete workflow runs
+        uses: GitRML/delete-workflow-runs@main
+        if: (github.event.inputs.deleteWorkflow == 'true' && github.event.inputs.deleteWorkflow  != 'false') || contains(github.event.action, 'deleteWorkflow')
+        with:
+          retain_days: 1
+          keep_minimum_runs: 10

@@ -21,8 +21,8 @@ on:
   #   types: [started]
 
 env:
-  Rec_name: PBRP
-  Rec_ver: 3.0.0
+  Rec_name: PBRP11
+  Rec_ver: 3.1.0
   Rec_url: https://github.com/PitchBlackRecoveryProject/manifest_pb.git -b android-11.0
   device: begonia
   DT_url: https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0

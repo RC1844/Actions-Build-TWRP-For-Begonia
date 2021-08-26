@@ -17,8 +17,6 @@ on:
         description: "是否禁用加密模块，true or false"
         required: false
         default: "false"
-  # watch:
-  #   types: [started]
 
 env:
   Rec_name: PBRP
