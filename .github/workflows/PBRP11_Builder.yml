@@ -21,10 +21,11 @@ env:
   DT_LINK: "https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0"
   VENDOR: "Redmi" # Example: xiaomi, samsung, asus, etc.
   CODENAME: "begonia" # Example: nikel, phoenix, ginkgo, etc.
-  KERNEL_LINK: "" # Only for building kernel from source. Ignore if using prebuilt.
   TARGET: "recoveryimage"
   FLAVOR: "eng"
-  EXTRA_CMD: "sed -i 's/vendor\/omni/vendor\/pb/g' omni_begonia.mk"
+  EXTRA_CMD: |
+    cd ${BuildPath}/device/${{ env.VENDOR }}/${{ env.CODENAME }}
+    sed -i 's/vendor\/omni/vendor\/pb/g' omni_begonia.mk
   TZ: "Asia/Shanghai" # Set Time-Zone According To Your Region
   WorkSpace: WorkSpace
   Rec_name: PBRP11
