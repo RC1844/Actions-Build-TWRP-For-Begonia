@@ -9,7 +9,7 @@ on:
 
 env:
   Rec_name: Ofox
-  Rec_ver: 11.0
+  Rec_ver: "11.0"
   Rec_url: https://gitlab.com/OrangeFox/sync -b master
   device: begonia
   DT_url: https://github.com/ZyCromerZ/twrp_redmi_begonia -b android-11.0
