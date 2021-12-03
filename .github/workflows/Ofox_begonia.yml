@@ -52,7 +52,7 @@ jobs:
         run: |
           mkdir ${{env.WorkSpace}}
           repo init -u ${{env.Rec_url}} --depth=1 --groups=all,-notdefault,-device,-darwin,-x86,-mips
-          ./sync/orangefox_sync.sh --branch ${{env.Rec_ver}} --path "$PWD/${{env.WorkSpace}}"
+          ./sync/orangefox_sync.sh --branch ${{env.Rec_ver}} --path " ${{ github.workspace }}/${{env.WorkSpace}}"
 
         # repo sync -j4
         # git clone https://gitlab.com/OrangeFox/sync.git --depth=1 --single-branch
