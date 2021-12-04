@@ -27,8 +27,8 @@ jobs:
     runs-on: ubuntu-18.04
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@master
+      # - name: Checkout
+      #   uses: actions/checkout@master
 
       - name: "Cleanup Environment"
         uses: rokibhasansagar/slimhub_actions@main
@@ -73,7 +73,7 @@ jobs:
           sed -i 's/TW_INCLUDE_CRYPTO_FBE := true/TW_INCLUDE_CRYPTO_FBE := false/g' BoardConfig.mk
 
       - name: Show tree
-        run: tree -C -d -L 6
+        run: tree -C -i -d -L 3
 
       - name: Restore cache
         uses: actions/cache@v2
@@ -121,7 +121,7 @@ jobs:
         run: |
           cd ${{steps.info.outputs.OutFolder}}
           sudo zip -r9 ${{env.Rec_name}}_for_${{ env.device }}_by_${{ env.Author }}.zip recovery.img
-          tree -C -L 5
+          tree -C -i -L 4
 
       - name: Upload firmware directory
         uses: actions/upload-artifact@main
