@@ -60,8 +60,6 @@ jobs:
         run: |
           cd ${{env.WorkSpace}}
           git clone ${{env.DT_url}} --depth=1 --single-branch ${{env.DT_path}}
-          cd ${{env.DT_path}}
-          sed -i 's/vendor\/${{env.ProductFileHeader}}/vendor\/pb/g' ${{env.ProductFileHeader}}_${{env.device}}.mk
 
       - name: Disable Crypto
         if: (github.event.inputs.crypto == 'true' && github.event.inputs.crypto  != 'false') || contains(github.event.action, 'crypto')

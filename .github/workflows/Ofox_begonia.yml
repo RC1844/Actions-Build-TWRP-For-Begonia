@@ -61,7 +61,8 @@ jobs:
           ./orangefox_sync.sh --branch ${{env.Rec_ver}} --path ${{github.workspace}}/${{env.WorkSpace}} --ssh 0
           echo "::endgroup::"
           echo "::group::sync Orangefox"
-          repo sync -j4 --force-sync bootable/recovery
+          cd ${{github.workspace}}/${{env.WorkSpace}}
+          repo sync -j4 --force-sync
           echo "::endgroup::"
 
       - name: Sync device tree
