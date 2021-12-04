@@ -62,7 +62,6 @@ jobs:
           git clone ${{env.DT_url}} --depth=1 --single-branch ${{env.DT_path}}
           cd ${{env.DT_path}}
           rm -rf recovery/root/system/lib64
-          repo sync -j4
 
       - name: Disable Crypto
         if: (github.event.inputs.crypto == 'true' && github.event.inputs.crypto  != 'false') || contains(github.event.action, 'crypto')

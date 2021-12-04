@@ -57,21 +57,17 @@ jobs:
           ./orangefox_sync.sh --help
           sed -i 's/recurse-submodules/depth=1/g' orangefox_sync.sh
           echo "::endgroup::"
-          echo "::group::Orangefox_sync"
+          echo "::group::Run Orangefox_sync.sh"
           ./orangefox_sync.sh --branch ${{env.Rec_ver}} --path ${{github.workspace}}/${{env.WorkSpace}} --ssh 0
           echo "::endgroup::"
-
-        # repo sync -j4
-        # git clone https://gitlab.com/OrangeFox/sync.git --depth=1 --single-branch
-        # cd sync
-        # sed -i 's/USE_SSH="1"/USE_SSH="0"/g' get_fox_10.sh
-        # ./get_fox_10.sh
+          echo "::group::sync Orangefox"
+          repo sync -j4 --force-sync bootable/recovery
+          echo "::endgroup::"
 
       - name: Sync device tree
         run: |
           cd ${{env.WorkSpace}}
           git clone ${{env.DT_url}} --depth=1 --single-branch ${{env.DT_path}}
-          repo sync -j4
 
       - name: Disable Crypto
         if: (github.event.inputs.crypto == 'true' && github.event.inputs.crypto  != 'false') || contains(github.event.action, 'crypto')
