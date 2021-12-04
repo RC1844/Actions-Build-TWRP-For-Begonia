@@ -20,7 +20,7 @@ env:
   Rec_ver: 3.1.0
   Rec_url: https://github.com/PitchBlackRecoveryProject/manifest_pb.git -b android-11.0
   device: begonia
-  DT_url: https://github.com/RC1844/twrp_redmi_begonia-1 -b android-11.0
+  DT_url: https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0
   DT_path: device/redmi/begonia
   ProductFileHeader: twrp
   target: recoveryimage
@@ -62,7 +62,6 @@ jobs:
           git clone ${{env.DT_url}} --depth=1 --single-branch ${{env.DT_path}}
           cd ${{env.DT_path}}
           sed -i 's/vendor\/${{env.ProductFileHeader}}/vendor\/pb/g' ${{env.ProductFileHeader}}_${{env.device}}.mk
-
 
       - name: Disable Crypto
         if: (github.event.inputs.crypto == 'true' && github.event.inputs.crypto  != 'false') || contains(github.event.action, 'crypto')
