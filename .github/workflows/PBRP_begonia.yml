@@ -1,0 +1,161 @@
+name: PBRP Builder
+
+on:
+  workflow_dispatch:
+    inputs:
+      crypto:
+        description: "是否禁用加密模块，true or false"
+        required: false
+        default: "false"
+      Enable_cache:
+        description: "是否启用cache，true or false"
+        required: true
+        default: "true"
+      Delete_oldReleases:
+        description: "是否删除旧的发布，true or false"
+        required: false
+        default: "false"
+env:
+  Rec_name: PBRP
+  Rec_ver: 3.0.0
+  Rec_url: https://github.com/PitchBlackRecoveryProject/manifest_pb.git -b android-10.0
+  device: begonia
+  DT_url: https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0
+  DT_path: device/redmi/begonia
+  ProductFileHeader: omni
+  target: recoveryimage
+  WorkSpace: WorkSpace
+  TZ: Asia/Shanghai
+  Author: RC1844
+  Delete_old: false
+
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+
+    steps:
+      - name: "Cleanup Environment"
+        uses: rokibhasansagar/slimhub_actions@main
+
+      - name: Initializing environment
+        run: |
+          sudo -E apt-get clean
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq install curl libstdc++6 git wget repo rsync aria2
+          git config --global user.name "RC1844"
+          git config --global user.email "1844766234@qq.com"
+          git clone https://gitlab.com/OrangeFox/misc/scripts.git --depth=1 --single-branch
+          cd scripts
+          sudo -E bash setup/android_build_env.sh
+          sudo -E bash setup/install_android_sdk.sh
+
+      - name: Sync recovery source
+        run: |
+          mkdir ${{env.WorkSpace}}
+          cd ${{env.WorkSpace}}
+          repo init -u ${{env.Rec_url}} --depth=1 --groups=all,-notdefault,-device,-darwin,-x86,-mips
+          repo sync -j4
+
+      - name: Sync device tree
+        run: |
+          cd ${{env.WorkSpace}}
+          git clone ${{env.DT_url}} --depth=1 --single-branch ${{env.DT_path}}
+          cd ${{env.DT_path}}
+          sed -i 's/vendor\/${{env.ProductFileHeader}}/vendor\/pb/g' ${{env.ProductFileHeader}}_${{env.device}}.mk
+          repo sync -j4
+
+      - name: Disable Crypto
+        if: (github.event.inputs.crypto == 'true' && github.event.inputs.crypto  != 'false') || contains(github.event.action, 'crypto')
+        run: |
+          cd ${{env.WorkSpace}}/${{env.DT_path}}
+          sed -i 's/TW_INCLUDE_CRYPTO := true/TW_INCLUDE_CRYPTO := false/g' BoardConfig.mk
+          sed -i 's/TW_INCLUDE_CRYPTO_FBE := true/TW_INCLUDE_CRYPTO_FBE := false/g' BoardConfig.mk
+
+      - name: Show tree
+        run: tree -C -d -L 3
+
+      - name: Restore cache
+        uses: actions/cache@v2
+        if: (github.event.inputs.Enable_cache == 'true' && github.event.inputs.Enable_cache  != 'false') || contains(github.event.action, 'Enable_cache')
+        with:
+          path: |
+            ~/.ccache
+            ${{env.WorkSpace}}/out
+          key: ${{runner.os}}-${{env.Rec_name}}-${{env.Rec_ver}}-${{env.device}}
+          restore-keys: |
+            ${{runner.os}}-${{env.Rec_name}}-${{env.Rec_ver}}-${{env.device}}
+
+      - name: Setup ccache
+        uses: alexjurkiewicz/setup-ccache@master
+        if: (github.event.inputs.Enable_cache == 'true' && github.event.inputs.Enable_cache  != 'false') || contains(github.event.action, 'Enable_cache')
+        with:
+          max-size: 5G
+          extra-config: |
+            keep_comments_cpp = true
+
+      - name: Building ${{env.Rec_name}}
+        run: |
+          cd ${{env.WorkSpace}}
+          echo "::group::EnvSetup"
+          source build/envsetup.sh
+          echo "::endgroup::"
+          echo "::group::SetEnvPath"
+          export ALLOW_MISSING_DEPENDENCIES=true
+          export MAINTAINER="Github @RC1844"
+          export CODENAME="${{env.device}}"
+          export VENDOR="redmi"
+          echo "::endgroup::"
+          echo "::group::lunch ${{env.ProductFileHeader}}_${{env.device}}-eng"
+          lunch ${{env.ProductFileHeader}}_${{env.device}}-eng
+          echo "::endgroup::"
+          echo "::group::sync"
+          repo sync -j4
+          echo "::endgroup::"
+          echo "::group::building"
+          mka ${{env.target}}
+          echo "::endgroup::"
+        shell: bash
+
+      - name: Get info
+        id: info
+        run: |
+          echo "::set-output name=date::$(/bin/date -u "+%Y-%m-%d-%H-%M")"
+          echo "::set-output name=OutFolder::"${{env.WorkSpace}}/out/target/product/${{env.device}}""
+          cd ${{steps.info.outputs.OutFolder}}
+          sudo zip -r9 ${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}.zip recovery.img
+          tree -C -L 4
+        shell: bash
+
+      - name: Upload firmware directory
+        uses: actions/upload-artifact@main
+        with:
+          name: ${{env.Rec_name}}_for_${{env.device}}-${{github.run_id}}
+          path: ${{steps.info.outputs.OutFolder}}/*.img
+
+      - name: Upload Release
+        uses: softprops/action-gh-release@master
+        with:
+          files: |
+            ${{steps.info.outputs.OutFolder}}/${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}.zip
+            ${{steps.info.outputs.OutFolder}}/*.img
+          name: ${{env.Rec_name}}-${{env.device}}-${{github.run_id}}
+          tag_name: ${{env.device}}-${{env.Rec_name}}-${{steps.info.outputs.date}}
+          body: |
+            ${{env.Rec_name}}-${{env.Rec_ver}} for ${{env.device}} build at ${{steps.info.outputs.date}}
+            Download link :https://download.fastgit.org/RC1844/Actions-Build-TWRP-For-Begonia/releases/download/${{env.device}}-${{env.Rec_name}}-${{steps.info.outputs.date}}/${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}.zip
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+      - name: Remove old Releases
+        uses: dev-drprasad/delete-older-releases@v0.1.0
+        if: (github.event.inputs.Delete_oldReleases == 'true' && github.event.inputs.Delete_oldReleases  != 'false') || contains(github.event.action, 'Delete_oldReleases')
+        with:
+          keep_latest: 12
+          delete_tags: true
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+      - name: Delete workflow runs
+        uses: GitRML/delete-workflow-runs@main
+        with:
+          keep_minimum_runs: 10
