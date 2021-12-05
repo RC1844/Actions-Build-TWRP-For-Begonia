@@ -129,11 +129,14 @@ jobs:
         id: info
         run: |
           echo "::set-output name=date::$(/bin/date -u "+%Y-%m-%d-%H-%M")"
-          echo "::set-output name=OutFolder::"${{env.WorkSpace}}/out/target/product/${{env.device}}""
-          cd ${{steps.info.outputs.OutFolder}}
-          sudo zip -r9 ${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}.zip recovery.img
-          tree -C -L 4
+          echo "::set-output name=OutFolder::"${{env.WorkSpace}}/out/target/product/${{ env.device }}""
         shell: bash
+
+      - name: Show out tree
+        run: |
+          cd ${{steps.info.outputs.OutFolder}}
+          sudo zip -r9 ${{env.Rec_name}}_for_${{ env.device }}_by_${{ env.Author }}.zip recovery.img
+          tree -C -L 5
 
       - name: Upload firmware directory
         uses: actions/upload-artifact@main
