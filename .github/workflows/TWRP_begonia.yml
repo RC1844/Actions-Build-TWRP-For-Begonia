@@ -78,7 +78,7 @@ jobs:
         if: (github.event.inputs.Enable_cache == 'true' && github.event.inputs.Enable_cache  != 'false') || contains(github.event.action, 'Enable_cache')
         with:
           path: |
-            ~/.ccache
+            /home/runner/.ccache
             ${{env.WorkSpace}}/out
           key: ${{runner.os}}-${{env.Rec_name}}-${{env.Rec_ver}}-${{env.device}}
           restore-keys: |
