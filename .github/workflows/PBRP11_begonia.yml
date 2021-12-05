@@ -39,22 +39,32 @@ jobs:
 
       - name: Initializing environment
         run: |
+          echo "::group::Install Build Env Tool"
           sudo -E apt-get clean
           sudo -E apt-get -qq update
           sudo -E apt-get -qq install curl libstdc++6 git wget repo rsync aria2
+          echo "::endgroup::"
           git config --global user.name "RC1844"
           git config --global user.email "1844766234@qq.com"
           git clone https://gitlab.com/OrangeFox/misc/scripts.git --depth=1 --single-branch
           cd scripts
+          echo "::group::Setup Build Env"
           sudo -E bash setup/android_build_env.sh
+          echo "::endgroup::"
+          echo "::group::Install Android Sdk"
           sudo -E bash setup/install_android_sdk.sh
+          echo "::endgroup::"
 
       - name: Sync recovery source
         run: |
           mkdir ${{env.WorkSpace}}
           cd ${{env.WorkSpace}}
+          echo "::group::Repo Init"
           repo init -u ${{env.Rec_url}} --depth=1 --groups=all,-notdefault,-device,-darwin,-x86,-mips
+          echo "::endgroup::"
+          echo "::group::Repo Sync"
           repo sync -j4
+          echo "::endgroup::"
 
       - name: Sync device tree
         run: |
@@ -92,25 +102,25 @@ jobs:
           extra-config: |
             keep_comments_cpp = true
 
-      - name: Building ${{env.Rec_name}}
+      - name: Build ${{env.Rec_name}}
         run: |
           cd ${{env.WorkSpace}}
-          echo "::group::EnvSetup"
+          echo "::group::Run Envsetup.sh"
           source build/envsetup.sh
           echo "::endgroup::"
-          echo "::group::SetEnvPath"
+          echo "::group::Set EnvPath"
           export ALLOW_MISSING_DEPENDENCIES=true
           export MAINTAINER="Github @RC1844"
           export CODENAME="${{env.device}}"
           export VENDOR="redmi"
           echo "::endgroup::"
-          echo "::group::lunch ${{env.ProductFileHeader}}_${{env.device}}-eng"
+          echo "::group::Lunch ${{env.ProductFileHeader}}_${{env.device}}-eng"
           lunch ${{env.ProductFileHeader}}_${{env.device}}-eng
           echo "::endgroup::"
-          echo "::group::sync"
+          echo "::group::Sync"
           repo sync -j4
           echo "::endgroup::"
-          echo "::group::building"
+          echo "::group::Build$ {{env.Rec_name}}"
           mka ${{env.target}}
           echo "::endgroup::"
         shell: bash
