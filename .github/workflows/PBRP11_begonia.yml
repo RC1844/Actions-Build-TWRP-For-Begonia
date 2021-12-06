@@ -26,7 +26,7 @@ env:
   target: recoveryimage
   WorkSpace: WorkSpace
   TZ: Asia/Shanghai
-  Author: RC1844
+  Author: ${{github.actor}}
   Delete_old: false
 
 jobs:
@@ -44,7 +44,7 @@ jobs:
           sudo -E apt-get -qq update
           sudo -E apt-get -qq install curl libstdc++6 git wget repo rsync aria2
           echo "::endgroup::"
-          git config --global user.name "RC1844"
+          git config --global user.name "${{github.actor}}"
           git config --global user.email "1844766234@qq.com"
           git clone https://gitlab.com/OrangeFox/misc/scripts.git --depth=1 --single-branch
           cd scripts
@@ -110,9 +110,8 @@ jobs:
           echo "::endgroup::"
           echo "::group::Set EnvPath"
           export ALLOW_MISSING_DEPENDENCIES=true
-          export MAINTAINER="Github @RC1844"
+          export MAINTAINER="Github @${{env.Author}}"
           export CODENAME="${{env.device}}"
-          export VENDOR="redmi"
           echo "::endgroup::"
           echo "::group::Lunch ${{env.ProductFileHeader}}_${{env.device}}-eng"
           lunch ${{env.ProductFileHeader}}_${{env.device}}-eng
@@ -120,7 +119,7 @@ jobs:
           echo "::group::Sync"
           repo sync -j4
           echo "::endgroup::"
-          echo "::group::Build$ {{env.Rec_name}}"
+          echo "::group::Build ${{env.Rec_name}}"
           mka ${{env.target}}
           echo "::endgroup::"
         shell: bash
@@ -129,13 +128,13 @@ jobs:
         id: info
         run: |
           echo "::set-output name=date::$(/bin/date -u "+%Y-%m-%d-%H-%M")"
-          echo "::set-output name=OutFolder::"${{env.WorkSpace}}/out/target/product/${{ env.device }}""
+          echo "::set-output name=OutFolder::"${{env.WorkSpace}}/out/target/product/${{env.device}}""
         shell: bash
 
       - name: Show out tree
         run: |
           cd ${{steps.info.outputs.OutFolder}}
-          sudo zip -r9 ${{env.Rec_name}}_for_${{ env.device }}_by_${{ env.Author }}.zip recovery.img
+          sudo zip -r9 ${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}.zip recovery.img
           tree -C -L 5
 
       - name: Upload firmware directory
@@ -154,7 +153,8 @@ jobs:
           tag_name: ${{env.device}}-${{env.Rec_name}}-${{steps.info.outputs.date}}
           body: |
             ${{env.Rec_name}}-${{env.Rec_ver}} for ${{env.device}} build at ${{steps.info.outputs.date}}
-            Download link :https://download.fastgit.org/RC1844/Actions-Build-TWRP-For-Begonia/releases/download/${{env.device}}-${{env.Rec_name}}-${{steps.info.outputs.date}}/${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}.zip
+            Actions:[${{github.run_id}}](${{github.server_url}}/${{github.repository}}/actions/runs/${{github.run_id}})
+            Download:[${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}.zip](https://download.fastgit.org/${{github.repository}}/releases/download/${{env.device}}-${{env.Rec_name}}-${{steps.info.outputs.date}}/${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}.zip)
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 

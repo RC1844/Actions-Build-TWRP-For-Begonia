@@ -26,7 +26,7 @@ env:
   target: recoveryimage
   WorkSpace: WorkSpace
   TZ: Asia/Shanghai
-  Author: RC1844
+  Author: ${{github.actor}}
   Delete_old: false
 
 jobs:
@@ -39,29 +39,37 @@ jobs:
 
       - name: Initializing environment
         run: |
+          echo "::group::Install Build Env Tool"
           sudo -E apt-get clean
           sudo -E apt-get -qq update
           sudo -E apt-get -qq install curl libstdc++6 git wget repo rsync aria2
-          git config --global user.name "RC1844"
+          echo "::endgroup::"
+          git config --global user.name "${{github.actor}}"
           git config --global user.email "1844766234@qq.com"
           git clone https://gitlab.com/OrangeFox/misc/scripts.git --depth=1 --single-branch
           cd scripts
+          echo "::group::Setup Build Env"
           sudo -E bash setup/android_build_env.sh
+          echo "::endgroup::"
+          echo "::group::Install Android Sdk"
           sudo -E bash setup/install_android_sdk.sh
+          echo "::endgroup::"
 
       - name: Sync recovery source
         run: |
           mkdir ${{env.WorkSpace}}
           cd ${{env.WorkSpace}}
+          echo "::group::Repo Init"
           repo init -u ${{env.Rec_url}} --depth=1 --groups=all,-notdefault,-device,-darwin,-x86,-mips
+          echo "::endgroup::"
+          echo "::group::Repo Sync"
           repo sync -j4
+          echo "::endgroup::"
 
       - name: Sync device tree
         run: |
           cd ${{env.WorkSpace}}
           git clone ${{env.DT_url}} --depth=1 --single-branch ${{env.DT_path}}
-          cd ${{env.DT_path}}
-          rm -rf recovery/root/system/lib64
 
       - name: Disable Crypto
         if: (github.event.inputs.crypto == 'true' && github.event.inputs.crypto  != 'false') || contains(github.event.action, 'crypto')
@@ -92,22 +100,22 @@ jobs:
           extra-config: |
             keep_comments_cpp = true
 
-      - name: Building ${{env.Rec_name}}
+      - name: Build ${{env.Rec_name}}
         run: |
           cd ${{env.WorkSpace}}
-          echo "::group::EnvSetup"
+          echo "::group::Run Envsetup.sh"
           source build/envsetup.sh
           echo "::endgroup::"
-          echo "::group::SetEnvPath"
+          echo "::group::Set EnvPath"
           export ALLOW_MISSING_DEPENDENCIES=true
           echo "::endgroup::"
-          echo "::group::lunch ${{env.ProductFileHeader}}_${{env.device}}-eng"
+          echo "::group::Lunch ${{env.ProductFileHeader}}_${{env.device}}-eng"
           lunch ${{env.ProductFileHeader}}_${{env.device}}-eng
           echo "::endgroup::"
-          echo "::group::sync"
+          echo "::group::Sync"
           repo sync -j4
           echo "::endgroup::"
-          echo "::group::building"
+          echo "::group::Build ${{env.Rec_name}}"
           mka ${{env.target}}
           echo "::endgroup::"
         shell: bash
@@ -117,10 +125,13 @@ jobs:
         run: |
           echo "::set-output name=date::$(/bin/date -u "+%Y-%m-%d-%H-%M")"
           echo "::set-output name=OutFolder::"${{env.WorkSpace}}/out/target/product/${{env.device}}""
+        shell: bash
+
+      - name: Show out tree
+        run: |
           cd ${{steps.info.outputs.OutFolder}}
           sudo zip -r9 ${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}.zip recovery.img
-          tree -C -L 4
-        shell: bash
+          tree -C -L 5
 
       - name: Upload firmware directory
         uses: actions/upload-artifact@main
@@ -138,7 +149,8 @@ jobs:
           tag_name: ${{env.device}}-${{env.Rec_name}}-${{steps.info.outputs.date}}
           body: |
             ${{env.Rec_name}}-${{env.Rec_ver}} for ${{env.device}} build at ${{steps.info.outputs.date}}
-            Download link :https://download.fastgit.org/RC1844/Actions-Build-TWRP-For-Begonia/releases/download/${{env.device}}-${{env.Rec_name}}-${{steps.info.outputs.date}}/${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}.zip
+            Actions:[${{github.run_id}}](${{github.server_url}}/${{github.repository}}/actions/runs/${{github.run_id}})
+            Download:[${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}.zip](https://download.fastgit.org/${{github.repository}}/releases/download/${{env.device}}-${{env.Rec_name}}-${{steps.info.outputs.date}}/${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}.zip)
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
