@@ -86,7 +86,7 @@ jobs:
         if: (github.event.inputs.Enable_cache == 'true' && github.event.inputs.Enable_cache  != 'false') || contains(github.event.action, 'Enable_cache')
         with:
           path: |
-            /home/runner/.ccache
+            ~/.ccache
             ${{env.WorkSpace}}/out
           key: ${{runner.os}}-${{env.Rec_name}}-${{env.Rec_ver}}-${{env.device}}
           restore-keys: |
@@ -127,11 +127,22 @@ jobs:
           echo "::set-output name=OutFolder::"${{env.WorkSpace}}/out/target/product/${{env.device}}""
         shell: bash
 
-      - name: Show out tree
+      - name: Show Space Info
         run: |
           cd ${{steps.info.outputs.OutFolder}}
           sudo zip -r9 ${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}.zip recovery.img
+          echo "::group::Out Directory Space"
+          du -sh
+          echo "::endgroup::"
+          echo "::group::Ccache Directory Space"
+          du -sh ~/.ccache
+          echo "::endgroup::"
+          echo "::group::Disk Space"
+          df -hlT /
+          echo "::endgroup::"
+          echo "::group::Out Tree"
           tree -C -L 5
+          echo "::endgroup::"
 
       - name: Upload firmware directory
         uses: actions/upload-artifact@main
