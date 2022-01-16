@@ -61,7 +61,6 @@ jobs:
           cd sync
           echo "::group::Orangefox_sync help"
           ./orangefox_sync.sh --help
-          sed -i 's/recurse-submodules/depth=1/g' orangefox_sync.sh
           echo "::endgroup::"
           echo "::group::Run Orangefox_sync.sh"
           ./orangefox_sync.sh --branch ${{env.Rec_ver}} --path ${{github.workspace}}/${{env.WorkSpace}} --ssh 0
