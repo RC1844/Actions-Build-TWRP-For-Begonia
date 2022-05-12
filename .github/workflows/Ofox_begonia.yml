@@ -65,9 +65,17 @@ jobs:
           echo "::group::Run Orangefox_sync.sh"
           ./orangefox_sync.sh --branch ${{env.Rec_ver}} --path ${{github.workspace}}/${{env.WorkSpace}} --ssh 0
           echo "::endgroup::"
-          echo "::group::sync Orangefox"
+          echo "::group::update manifest "
           cd ${{github.workspace}}/${{env.WorkSpace}}
-          repo sync -j4 --force-sync
+          repo sync # (ignore all errors and suggestions relating to "android_bootable_recovery")
+          echo "::endgroup::"
+          echo "::group::update recovery sources"
+          cd bootable/recovery/
+          git pull --recurse-submodules
+          echo "::endgroup::"
+          echo "::group::update vendor tree"
+          cd ../../vendor/recovery/
+          git pull
           echo "::endgroup::"
 
       - name: Sync device tree
