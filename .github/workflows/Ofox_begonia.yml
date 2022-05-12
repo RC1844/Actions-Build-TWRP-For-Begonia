@@ -104,7 +104,6 @@ jobs:
         run: |
           cd ${{env.WorkSpace}}
           echo "::group::Run Envsetup.sh"
-          source ${GITHUB_WORKSPACE}/config/base.sh
           source build/envsetup.sh || true
           echo "::endgroup::"
           echo "::group::Set EnvPath"
