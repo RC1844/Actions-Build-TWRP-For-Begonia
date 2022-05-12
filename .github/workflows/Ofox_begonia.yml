@@ -104,7 +104,8 @@ jobs:
         run: |
           cd ${{env.WorkSpace}}
           echo "::group::Run Envsetup.sh"
-          source build/envsetup.sh
+          source ${GITHUB_WORKSPACE}/config/base.sh
+          source build/envsetup.sh || true
           echo "::endgroup::"
           echo "::group::Set EnvPath"
           export ALLOW_MISSING_DEPENDENCIES=true
@@ -117,9 +118,6 @@ jobs:
           echo "::endgroup::"
           echo "::group::Lunch ${{env.ProductFileHeader}}_${{env.device}}-eng"
           lunch ${{env.ProductFileHeader}}_${{env.device}}-eng
-          echo "::endgroup::"
-          echo "::group::Sync"
-          repo sync -j4
           echo "::endgroup::"
           echo "::group::Build ${{env.Rec_name}}"
           mka ${{env.target}}
