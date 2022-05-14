@@ -130,7 +130,7 @@ jobs:
       - name: Show Space Info
         run: |
           cd ${{steps.info.outputs.OutFolder}}
-          sudo zip -r9 ${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}.zip recovery.img
+          sudo zip -r9 ${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}_${{github.run_attempt}}.zip recovery.img
           echo "::group::Out Directory Space"
           du -sh
           echo "::endgroup::"
@@ -153,15 +153,16 @@ jobs:
       - name: Upload Release
         uses: softprops/action-gh-release@master
         with:
+          prerelease: true
           files: |
-            ${{steps.info.outputs.OutFolder}}/${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}.zip
             ${{steps.info.outputs.OutFolder}}/*.img
-          name: ${{env.Rec_name}}-${{env.device}}-${{github.run_id}}
+            ${{steps.info.outputs.OutFolder}}/*.zip
+          name: ${{env.Rec_name}}-${{env.device}}_${{github.run_attempt}}
           tag_name: ${{env.device}}-${{env.Rec_name}}-${{steps.info.outputs.date}}
           body: |
             ${{env.Rec_name}}-${{env.Rec_ver}} for ${{env.device}} build at ${{steps.info.outputs.date}}
             Actions:[${{github.run_id}}](${{github.server_url}}/${{github.repository}}/actions/runs/${{github.run_id}})
-            Download:[${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}.zip](https://download.fastgit.org/${{github.repository}}/releases/download/${{env.device}}-${{env.Rec_name}}-${{steps.info.outputs.date}}/${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}.zip)
+            Download:[${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}_${{github.run_attempt}}.zip](https://download.fastgit.org/${{github.repository}}/releases/download/${{env.device}}-${{env.Rec_name}}-${{steps.info.outputs.date}}/${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}_${{github.run_attempt}}.zip)
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
