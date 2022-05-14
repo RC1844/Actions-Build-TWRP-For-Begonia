@@ -144,7 +144,7 @@ jobs:
           df -hlT /
           echo "::endgroup::"
           echo "::group::Out Tree"
-          tree -C -L 5
+          tree -C -L 5 -I "obj"
           echo "::endgroup::"
 
       - name: Upload firmware directory
