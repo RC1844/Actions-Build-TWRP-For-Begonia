@@ -133,7 +133,7 @@ jobs:
       - name: Show Space Info
         run: |
           cd ${{steps.info.outputs.OutFolder}}
-          sudo zip -r9 ${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}_${{github.run_attempt}}.zip recovery.img
+          sudo zip -r9 ${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}_${{github.run_id}}.zip recovery.img
           echo "::group::Out Directory Space"
           du -sh
           echo "::endgroup::"
@@ -144,7 +144,7 @@ jobs:
           df -hlT /
           echo "::endgroup::"
           echo "::group::Out Tree"
-          tree -C -L 5 -I "obj"
+          tree -C -L 5 -I "obj*"
           echo "::endgroup::"
 
       - name: Upload firmware directory
@@ -158,14 +158,14 @@ jobs:
         with:
           prerelease: true
           files: |
-            ${{steps.info.outputs.OutFolder}}/*.img
+            ${{steps.info.outputs.OutFolder}}/recovery.img
             ${{steps.info.outputs.OutFolder}}/*.zip
-          name: ${{env.Rec_name}}-${{env.device}}_${{github.run_attempt}}
+          name: ${{env.Rec_name}}-${{env.device}}_${{github.run_id}}
           tag_name: ${{env.device}}-${{env.Rec_name}}-${{steps.info.outputs.date}}
           body: |
             ${{env.Rec_name}}-${{env.Rec_ver}} for ${{env.device}} build at ${{steps.info.outputs.date}}
             Actions:[${{github.run_id}}](${{github.server_url}}/${{github.repository}}/actions/runs/${{github.run_id}})
-            Download:[${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}_${{github.run_attempt}}.zip](https://download.fastgit.org/${{github.repository}}/releases/download/${{env.device}}-${{env.Rec_name}}-${{steps.info.outputs.date}}/${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}_${{github.run_attempt}}.zip)
+            Download:[${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}_${{github.run_id}}.zip](https://download.fastgit.org/${{github.repository}}/releases/download/${{env.device}}-${{env.Rec_name}}-${{steps.info.outputs.date}}/${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}_${{github.run_id}}.zip)
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
