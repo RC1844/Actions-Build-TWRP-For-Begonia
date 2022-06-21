@@ -46,7 +46,7 @@ jobs:
           echo "::endgroup::"
           git config --global user.name "${{github.actor}}"
           git config --global user.email "1844766234@qq.com"
-          git clone https://gitlab.com/OrangeFox/misc/scripts.git --depth=1 --single-branch
+          git clone https://github.com/akhilnarang/scripts --depth=1 --single-branch
           cd scripts
           echo "::group::Setup Build Env"
           sudo -E bash setup/android_build_env.sh
