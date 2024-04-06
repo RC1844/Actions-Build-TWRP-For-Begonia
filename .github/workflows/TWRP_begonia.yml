@@ -135,9 +135,6 @@ jobs:
           echo "::group::Out Directory Space"
           du -sh
           echo "::endgroup::"
-          echo "::group::Ccache Directory Space"
-          du -sh ~/.ccache
-          echo "::endgroup::"
           echo "::group::Disk Space"
           df -hlT /
           echo "::endgroup::"
