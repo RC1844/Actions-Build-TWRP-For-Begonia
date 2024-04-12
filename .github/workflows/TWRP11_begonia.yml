@@ -20,7 +20,7 @@ env:
   Rec_ver: 3.6.0
   Rec_url: https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp -b twrp-11
   device: begonia
-  DT_url: https://github.com/shhhamik/twrp_device_xiaomi_begonia -b twrp-12.1
+  DT_url: https://github.com/RC1844/twrp_redmi_begonia -b MIUI-android-11.0
   DT_path: device/redmi/begonia
   ProductFileHeader: twrp
   target: recoveryimage
