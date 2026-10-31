@@ -630,13 +630,14 @@ jobs:
         if: ${{ env.VALIDATE_ONLY != 'true' }}
         shell: bash
         run: |
+          # 注意：envsetup.sh 及其 mka / lunch / gettop 等函数会在未定义变量上直接取值
+          # （如 gettop 里的 "$TOP"），因此本步骤不能开启 nounset(set -u)，
+          # 否则会报 `TOP: unbound variable` 且 mka 静默失败。
           set -eo pipefail
           cd "$WORKSPACE_DIR"
 
           echo "::group::envsetup"
-          set +u
           source build/envsetup.sh
-          set -u
           echo "::endgroup::"
 
           if [ "${ALLOW_MISSING_DEPENDENCIES:-false}" = "true" ]; then
@@ -646,9 +647,7 @@ jobs:
           # 可选：repopick 指定 Gerrit change（依赖 envsetup 提供的 repopick 函数）
           if [ -n "${REPOPICK_PATCHES:-}" ]; then
             echo "::group::repopick $REPOPICK_PATCHES"
-            set +u
             repopick -g "${REPOPICK_GERRIT:-https://gerrit.twrp.me}" $REPOPICK_PATCHES
-            set -u
             echo "::endgroup::"
           fi
 
@@ -677,9 +676,7 @@ jobs:
           fi
 
           echo "::group::lunch $lunch_target"
-          set +u
           lunch "$lunch_target"
-          set -u
           echo "::endgroup::"
 
           # 构建目标归一化：recovery → recoveryimage，vendor_boot → vendorbootimage
@@ -698,6 +695,20 @@ jobs:
             mka "$build_target"
           fi
           echo "::endgroup::"
+
+          # envsetup 的 mka 在定位源码树失败时会静默返回 0，这里补一次产物存在性校验，
+          # 让失败停在 Build 步骤而不是拖到打包步骤才报错。
+          out_dir="out/target/product/$DEVICE"
+          if [ ! -d "$out_dir" ]; then
+            echo "::error::构建未产出 $out_dir，mka $build_target 可能没有真正执行（请检查 envsetup / lunch 日志）"
+            exit 1
+          fi
+          first_img="$(find "$out_dir" -maxdepth 1 -type f -name "${IMAGE_GLOB:-recovery*.img}" -print -quit)"
+          if [ -z "$first_img" ]; then
+            echo "::error::$out_dir 中没有匹配 ${IMAGE_GLOB:-recovery*.img} 的产物"
+            ls -lh "$out_dir" || true
+            exit 1
+          fi
 
       - name: Collect and package output
         id: pack
