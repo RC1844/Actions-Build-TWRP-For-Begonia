@@ -1,0 +1,96 @@
+name: Build Recovery (begonia)
+
+# 调用方示例：只维护一张"构建目标表"，构建逻辑全部复用 build-recovery.yml。
+# workflow_dispatch 顶层 inputs 有 10 个上限，因此这里用 targets(JSON 数组)
+# 承载每个目标的全套参数；键名与 build-recovery.yml 头部 C 节 schema 一致，
+# 多出的键（如 publish_release）会被忽略，不会报错。
+
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: "构建目标 JSON 数组（键名见 build-recovery.yml 头部 C 节）"
+        required: false
+        type: string
+        default: |
+          [
+            {
+              "recovery_name": "TWRP",
+              "recovery_version": "3.7.0",
+              "device": "begonia",
+              "manifest_url": "https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp",
+              "manifest_branch": "twrp-11",
+              "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
+              "device_tree_branch": "MIUI-android-11.0",
+              "device_tree_path": "device/redmi/begonia",
+              "lunch_prefix": "twrp",
+              "publish_release": false
+            },
+            {
+              "recovery_name": "PBRP",
+              "recovery_version": "3.1.0",
+              "device": "begonia",
+              "manifest_url": "https://github.com/PitchBlackRecoveryProject/manifest_pb",
+              "manifest_branch": "android-11.0",
+              "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
+              "device_tree_branch": "MIUI-android-11.0",
+              "device_tree_path": "device/redmi/begonia",
+              "lunch_prefix": "twrp",
+              "publish_release": false
+            },
+            {
+              "recovery_name": "SHRP",
+              "recovery_version": "v3_11.0",
+              "device": "begonia",
+              "manifest_url": "https://github.com/SHRP/manifest",
+              "manifest_branch": "v3_11.0",
+              "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
+              "device_tree_branch": "MIUI-android-11.0",
+              "device_tree_path": "device/redmi/begonia",
+              "lunch_prefix": "twrp",
+              "publish_release": false
+            },
+            {
+              "recovery_name": "TWRP",
+              "recovery_version": "3.6.0",
+              "device": "begonia",
+              "manifest_url": "https://github.com/RC1844/platform_manifest_twrp_omni",
+              "manifest_branch": "twrp-10.0",
+              "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
+              "device_tree_branch": "MIUI-android-11.0",
+              "device_tree_path": "device/redmi/begonia",
+              "lunch_prefix": "omni",
+              "publish_release": false
+            }
+          ]
+      validate_only:
+        description: "仅校验配置，不执行构建"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+# 同一分支只允许一次调度，避免手动连点造成重复排队；不取消进行中的构建
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: ${{ matrix.recovery_name }} / ${{ matrix.device }}
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include: ${{ fromJSON(inputs.targets || '[]') }}
+    uses: ./.github/workflows/build-recovery.yml
+    permissions:
+      contents: write
+    with:
+      config: ${{ toJSON(matrix) }}
+      validate_only: ${{ inputs.validate_only }}
+      # 下面这些目标都是 Android 10/11 老分支，预编译工具依赖 openjdk-8 / libncurses5，
+      # 只能用 ubuntu-22.04；改用 24.04 需同时确认分支已升级工具链（可配合 java_version）。
+      runner: ubuntu-22.04

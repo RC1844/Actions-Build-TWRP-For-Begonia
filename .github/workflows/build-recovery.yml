@@ -1,0 +1,844 @@
+name: Reusable Recovery Build
+
+# =============================================================================
+# 通用 Recovery 构建 / 恢复流水线（可复用 + 可手动触发）
+# -----------------------------------------------------------------------------
+# 本文件不含任何机型、源码仓库、分支、路径、资源配额、发布地址等硬编码配置。
+# 所有可变项都在运行时通过「两层参数」注入，核心流程在任意项目间完全复用。
+#
+# 参数分层
+#   第一层（控制面）：workflow_call / workflow_dispatch 的 inputs，仅 4 个。
+#     GitHub 对顶层 inputs 有 10 个的数量上限，所以构建细节不放在这里。
+#   第二层（配置面）：config JSON（内联 inputs.config 或仓库内 config_file）
+#     + 仓库级 vars，承载全部构建细节，键名见下方 C 节 schema。
+#
+# 参数优先级（后者覆盖前者）
+#   内置默认值(CONFIG_DEFAULTS) < config_file < 内联 inputs.config
+#
+# 运行时环境变量约定：合并后的每个键都会导出为「全大写同名」环境变量
+#   （manifest_url → MANIFEST_URL，device_tree_path → DEVICE_TREE_PATH），
+#   所有步骤只读取这些环境变量，因此新增/调整参数不需要改任何流程代码。
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# A. 触发输入参数（workflow_call 与 workflow_dispatch 定义完全一致）
+# -----------------------------------------------------------------------------
+# | 名称          | 类型    | 必填 | 默认值 | 可选范围                                     | 说明 |
+# | ------------- | ------- | ---- | ------ | -------------------------------------------- | ---- |
+# | config        | string  | 否   | {}     | 任意合法 JSON 对象（键见 C 节）               | 内联配置，优先级最高 |
+# | config_file   | string  | 否   | ""     | 仓库内相对路径，如 .github/recovery.json      | 配置文件；与 config 同时存在时 config 覆盖它 |
+# | runner        | string  | 否   | ""     | GitHub 托管标签或自托管标签，如 ubuntu-24.04  | 空 → vars.RECOVERY_RUNNER → ubuntu-24.04 |
+# | validate_only | boolean | 否   | false  | true / false                                 | true 时只解析并校验配置、输出配置摘要，不执行构建 |
+#
+# 说明：
+#   · 运行环境默认 ubuntu-24.04（当前最新 LTS 托管镜像）。Android 12 及以上分支可直接使用；
+#     Android 10/11 等 legacy 分支的预编译工具依赖 openjdk-8、libncurses5、libtinfo5 等
+#     仅 22.04 提供（或仍提供）的包，这类目标请显式传 runner: ubuntu-22.04。
+#   · JDK 版本由 config.java_version 控制：留空表示沿用镜像自带 JDK；需要固定版本时
+#     填写 8 / 11 / 17 / 21，由 actions/setup-java 安装 Temurin 对应版本。
+#   · 需要加密/解密等敏感值请使用 config_file 配合仓库 Secrets 或 vars，不要写进
+#     工作流文件本身。
+#
+# 可选 Secrets（workflow_dispatch 直接读仓库 Secrets；workflow_call 需调用方传 secrets）
+# | 名称             | 说明 |
+# | ---------------- | ---- |
+# | RECOVERY_SSH_KEY | 访问私有源码/设备树仓库的 SSH 私钥；使用 git@ 形式地址时必填，公开 https 地址无需 |
+
+# -----------------------------------------------------------------------------
+# B. 仓库级 Variables（可选）
+#    Settings → Secrets and variables → Actions → Variables
+# -----------------------------------------------------------------------------
+# | 名称                     | 默认行为      | 说明 |
+# | ------------------------ | ------------- | ---- |
+# | RECOVERY_RUNNER          | ubuntu-24.04  | 未显式传 runner 时采用的运行环境 |
+# | RECOVERY_TIMEOUT_MINUTES | 300           | 单个构建 job 的超时时间（分钟） |
+
+# -----------------------------------------------------------------------------
+# C. config / config_file 支持的完整键表（全部可选，除标注「必填」外均有默认值）
+# -----------------------------------------------------------------------------
+# | 键                        | 类型   | 默认值                                          | 说明 / 可选范围 |
+# | ------------------------- | ------ | ----------------------------------------------- | --------------- |
+# | device                    | string | ""                                              | 设备代号，用于产物命名与默认 lunch 目标。【必填】 |
+# | recovery_name             | string | "Recovery"                                      | 产物与 Release 展示名，如 TWRP / PBRP / SHRP |
+# | recovery_version          | string | ""                                              | 版本号，仅写入说明与产物信息 |
+# | manifest_url              | string | ""                                              | 源码 manifest 仓库地址。【必填】 |
+# | manifest_branch           | string | ""                                              | 源码 manifest 分支。【必填】 |
+# | manifest_depth            | int    | 1                                               | repo init --depth；0 = 完整历史（范围 ≥ 0） |
+# | manifest_groups           | string | "all,-notdefault,-device,-darwin,-x86,-mips"     | repo init --groups；空字符串表示不传该参数 |
+# | workspace_dir             | string | "workspace"                                     | 源码工作目录（相对仓库根目录） |
+# | device_tree_url           | string | ""                                              | 设备树仓库地址。【必填】 |
+# | device_tree_branch        | string | ""                                              | 设备树分支；空则使用仓库默认分支 |
+# | device_tree_path          | string | ""                                              | 设备树放置路径，如 device/<vendor>/<device>。【必填】 |
+# | common_tree_url           | string | ""                                              | 公共设备树地址；多机型共用树（sm8250-common 之类）时填写 |
+# | common_tree_branch        | string | ""                                              | 公共设备树分支；空则用仓库默认分支 |
+# | common_tree_path          | string | ""                                              | 公共设备树放置路径，如 device/<vendor>/sm8250-common |
+# | device_patch_script       | string | ""                                              | 设备树内补丁脚本（相对设备树根），如 prebuilt/sourcecode/patch.sh；非空则克隆后执行，失败仅告警 |
+# | dependencies_local_manifest | bool | false                                           | 是否把设备树 *.dependencies 转成 .repo/local_manifests/roomservice.xml 并补一次 sync 拉依赖 |
+# | repopick_patches          | string | ""                                              | 空格分隔的 Gerrit change 号，envsetup 后、lunch 前执行 repopick |
+# | repopick_gerrit           | string | "https://gerrit.twrp.me"                        | repopick -g 使用的 Gerrit 地址 |
+# | lunch_prefix              | string | ""                                              | lunch 前缀，如 twrp / omni / aosp；留空则按 manifest 自动推导（含 omni → omni，其余 → twrp） |
+# | lunch_variant             | string | "eng"                                           | lunch 变体，如 eng / userdebug / user |
+# | lunch_target              | string | ""                                              | 完整 lunch 目标；非空时覆盖 <prefix>_<device>-<variant> |
+# | build_target              | string | "recoveryimage"                                 | mka 构建目标；接受 recovery / boot / vendor_boot 简写，自动补 image 后缀 |
+# | build_env                 | object | {}                                              | 构建前额外导出的环境变量，键值均为字符串 |
+# | allow_missing_dependencies| bool   | true                                            | 是否设置 ALLOW_MISSING_DEPENDENCIES=true |
+# | disable_crypto            | bool   | false                                           | 是否关闭 TW_INCLUDE_CRYPTO / TW_INCLUDE_CRYPTO_FBE |
+# | repo_sync_jobs            | int    | 0                                               | repo sync 并发数；0 = CPU 核数（范围 ≥ 0） |
+# | repo_sync_retries         | int    | 3                                               | manifest / 设备树同步最大尝试次数（范围 1–10） |
+# | make_jobs                 | int    | 0                                               | mka -j 并发数；0 = CPU 核数（范围 ≥ 0） |
+# | free_disk_space           | bool   | true                                            | 是否清理 runner 预装的大体积目录 |
+# | setup_swap                | bool   | true                                            | 是否创建 swap 作为 OOM 兜底 |
+# | swap_size                 | string | "8G"                                            | swap 大小，支持 K/M/G 后缀，如 4G / 8192M |
+# | extra_packages            | string | ""                                              | 额外 apt 依赖包，空格分隔 |
+# | java_version              | string | ""                                              | 构建用 JDK 版本，如 8 / 11 / 17 / 21；留空沿用镜像自带 JDK，非空时由 actions/setup-java 安装 Temurin |
+# | ccache_enabled            | bool   | true                                            | 是否启用 ccache 缓存 |
+# | ccache_max_size           | string | "5G"                                            | ccache 体积上限 |
+# | upload_artifact           | bool   | true                                            | 是否上传 Actions artifact |
+# | artifact_retention_days   | int    | 14                                              | artifact 保留天数（范围 1–90） |
+# | artifact_name             | string | ""                                              | artifact 名称；空则自动生成 |
+# | publish_release           | bool   | false                                           | 是否发布 GitHub Release（需要 contents: write） |
+# | release_prerelease        | bool   | true                                            | Release 是否标记为预发布 |
+# | keep_releases             | int    | 3                                               | 发布后保留最近多少个 Release；0 = 不清理（范围 ≥ 0） |
+# | release_notes_extra       | string | ""                                              | 追加到 Release 说明末尾的文本 |
+# | image_glob                | string | "recovery*.img"                                 | 产物图片匹配通配符（相对 out/target/product/<device>） |
+# | extra_artifacts_glob      | string | ""                                              | 额外打包进 zip 的文件通配符，空格分隔，如 "ramdisk-recovery.* *installer*zip" |
+# | min_image_size_mb         | int    | 1                                               | 产物最小体积校验（MB）；0 = 跳过（范围 ≥ 0） |
+# | timezone                  | string | "Asia/Shanghai"                                 | 时间戳与日志时区，同时导出为 TZ |
+#
+# -----------------------------------------------------------------------------
+# D. 其它项目接入三步
+#   1) 把本文件复制到目标仓库 .github/workflows/ 下（文件名任意）；
+#   2) 在仓库内新增 .github/recovery.json，按 C 节填写 config 键；
+#   3) 新建一个调用方 workflow（或用本文件自带的 workflow_dispatch 手动运行）：
+#        jobs:
+#          build:
+#            uses: ./.github/workflows/build-recovery.yml
+#            permissions: { contents: write }
+#            with:
+#              config_file: .github/recovery.json
+#              # 或 config: '{"device":"xxx","manifest_url":"...", ...}'
+#   只需调整参数，无需改动本文件任何流程代码。
+# -----------------------------------------------------------------------------
+
+on:
+  workflow_call:
+    secrets:
+      RECOVERY_SSH_KEY:
+        description: "访问私有源码/设备树仓库的 SSH 私钥（可选，公开 https 地址无需）"
+        required: false
+    inputs:
+      config:
+        description: "内联配置 JSON 对象（键见文件头部 C 节），优先级高于 config_file"
+        required: false
+        type: string
+        default: "{}"
+      config_file:
+        description: "仓库内 JSON 配置文件相对路径，如 .github/recovery.json"
+        required: false
+        type: string
+        default: ""
+      runner:
+        description: "运行环境；留空则依次回退到 vars.RECOVERY_RUNNER、ubuntu-24.04"
+        required: false
+        type: string
+        default: ""
+      validate_only:
+        description: "仅解析并校验配置，不执行构建"
+        required: false
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      config:
+        description: "内联配置 JSON 对象（键见文件头部 C 节），优先级高于 config_file"
+        required: false
+        type: string
+        default: "{}"
+      config_file:
+        description: "仓库内 JSON 配置文件相对路径，如 .github/recovery.json"
+        required: false
+        type: string
+        default: ""
+      runner:
+        description: "运行环境；留空则依次回退到 vars.RECOVERY_RUNNER、ubuntu-24.04"
+        required: false
+        type: string
+        default: ""
+      validate_only:
+        description: "仅解析并校验配置，不执行构建"
+        required: false
+        type: boolean
+        default: false
+
+# 发布 Release / 清理旧 Release 需要写权限（新仓库默认只读）
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build recovery
+    runs-on: ${{ inputs.runner || vars.RECOVERY_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: ${{ fromJSON(vars.RECOVERY_TIMEOUT_MINUTES || '300') }}
+
+    env:
+      INPUT_CONFIG: ${{ inputs.config }}
+      INPUT_CONFIG_FILE: ${{ inputs.config_file }}
+      VALIDATE_ONLY: ${{ inputs.validate_only }}
+      # 只暴露"是否提供私钥"的布尔值，私钥本身仅注入到配置 SSH 的那一步，避免被其它 action 读到
+      HAS_SSH_KEY: ${{ secrets.RECOVERY_SSH_KEY != '' }}
+      GIT_TERMINAL_PROMPT: "0"
+      DEBIAN_FRONTEND: noninteractive
+      LC_ALL: C.UTF-8
+      # 全部配置项的兜底默认值（唯一一处内置常量，均为通用值，不含项目信息）
+      CONFIG_DEFAULTS: |
+        {
+          "recovery_name": "Recovery",
+          "recovery_version": "",
+          "device": "",
+          "manifest_url": "",
+          "manifest_branch": "",
+          "manifest_depth": 1,
+          "manifest_groups": "all,-notdefault,-device,-darwin,-x86,-mips",
+          "workspace_dir": "workspace",
+          "device_tree_url": "",
+          "device_tree_branch": "",
+          "device_tree_path": "",
+          "common_tree_url": "",
+          "common_tree_branch": "",
+          "common_tree_path": "",
+          "device_patch_script": "",
+          "dependencies_local_manifest": false,
+          "repopick_patches": "",
+          "repopick_gerrit": "https://gerrit.twrp.me",
+          "lunch_prefix": "",
+          "lunch_variant": "eng",
+          "lunch_target": "",
+          "build_target": "recoveryimage",
+          "build_env": {},
+          "allow_missing_dependencies": true,
+          "disable_crypto": false,
+          "repo_sync_jobs": 0,
+          "repo_sync_retries": 3,
+          "make_jobs": 0,
+          "free_disk_space": true,
+          "setup_swap": true,
+          "swap_size": "8G",
+          "extra_packages": "",
+          "java_version": "",
+          "ccache_enabled": true,
+          "ccache_max_size": "5G",
+          "upload_artifact": true,
+          "artifact_retention_days": 14,
+          "artifact_name": "",
+          "publish_release": false,
+          "release_prerelease": true,
+          "keep_releases": 3,
+          "release_notes_extra": "",
+          "image_glob": "recovery*.img",
+          "extra_artifacts_glob": "",
+          "min_image_size_mb": 1,
+          "timezone": "Asia/Shanghai"
+        }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Configure SSH for private repositories
+        if: ${{ env.VALIDATE_ONLY != 'true' && env.HAS_SSH_KEY == 'true' }}
+        env:
+          RECOVERY_SSH_KEY: ${{ secrets.RECOVERY_SSH_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$RECOVERY_SSH_KEY" > ~/.ssh/id_recovery
+          chmod 600 ~/.ssh/id_recovery
+          ssh-keyscan -H github.com gitlab.com >> ~/.ssh/known_hosts 2>/dev/null || true
+          cat > ~/.ssh/config <<'EOF'
+          Host github.com gitlab.com
+            IdentityFile ~/.ssh/id_recovery
+            IdentitiesOnly yes
+            StrictHostKeyChecking accept-new
+          EOF
+          echo "已配置 SSH 私钥，私有仓库可使用 git@ 地址"
+
+      - name: Resolve configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+
+          # 1) 内联 config：缺省视为 {}，必须是合法 JSON 对象
+          inline="${INPUT_CONFIG:-}"
+          [ -n "$inline" ] || inline='{}'
+          printf '%s' "$inline" > "$tmp/inline.json"
+          if ! jq -e 'type == "object"' "$tmp/inline.json" >/dev/null 2>&1; then
+            echo "::error::inputs.config 不是合法的 JSON 对象，请检查引号/逗号"
+            head -c 500 "$tmp/inline.json" || true
+            exit 1
+          fi
+
+          # 2) 配置文件（可选）：路径相对仓库根目录
+          sources=("$tmp/inline.json")
+          cfg_file="${INPUT_CONFIG_FILE:-}"
+          if [ -n "$cfg_file" ]; then
+            if [ ! -f "$cfg_file" ]; then
+              echo "::error::config_file 指定的文件不存在：$cfg_file"
+              exit 1
+            fi
+            if ! jq -e 'type == "object"' "$cfg_file" >/dev/null 2>&1; then
+              echo "::error::config_file 不是合法的 JSON 对象：$cfg_file"
+              exit 1
+            fi
+            sources=("$cfg_file" "$tmp/inline.json")
+          fi
+
+          # 3) 三级合并：默认值 < 配置文件 < 内联 config
+          printf '%s' "$CONFIG_DEFAULTS" > "$tmp/defaults.json"
+          jq -s 'reduce .[] as $item ({}; . * $item)' "$tmp/defaults.json" "${sources[@]}" > "$tmp/merged.json"
+
+          resolved="$GITHUB_WORKSPACE/.recovery-resolved.json"
+          cp "$tmp/merged.json" "$resolved"
+          echo "CONFIG_PATH=$resolved" >> "$GITHUB_ENV"
+
+          # 4) 每个键导出为同名大写环境变量（heredoc 写法可安全承载多行/特殊字符）
+          while IFS= read -r key; do
+            name="$(printf '%s' "$key" | tr '[:lower:]' '[:upper:]')"
+            value="$(jq -r --arg k "$key" '.[$k] | tostring' "$tmp/merged.json")"
+            {
+              echo "${name}<<__RECOVERY_EOF__"
+              printf '%s\n' "$value"
+              echo "__RECOVERY_EOF__"
+            } >> "$GITHUB_ENV"
+          done < <(jq -r 'keys[] | select(. != "build_env")' "$tmp/merged.json")
+
+          # 5) build_env 单独序列化，构建步骤再展开，避免污染全局 env
+          {
+            echo "BUILD_ENV_JSON<<__RECOVERY_EOF__"
+            jq -c '.build_env // {}' "$tmp/merged.json"
+            echo "__RECOVERY_EOF__"
+          } >> "$GITHUB_ENV"
+
+          # 6) timezone 同步导出为 TZ
+          echo "TZ=$(jq -r '.timezone // "Asia/Shanghai"' "$tmp/merged.json")" >> "$GITHUB_ENV"
+
+          # 7) URL 中带凭据（user:token@host）时打码，避免泄露到日志
+          while IFS= read -r secret; do
+            echo "::add-mask::$secret"
+          done < <(jq -r '.. | strings | select(test("@"))' "$tmp/merged.json" || true)
+
+          echo "配置合并完成：默认值 < ${cfg_file:-（无配置文件）} < 内联 config"
+
+      - name: Validate configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail=0
+
+          # 必填项：通用流水线无法猜测"要构建什么"，这 5 项必须由调用方给出
+          missing=""
+          for v in DEVICE MANIFEST_URL MANIFEST_BRANCH DEVICE_TREE_URL DEVICE_TREE_PATH; do
+            [ -n "${!v:-}" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::缺少必填配置:$missing（键名见文件头部 C 节，可用 config 或 config_file 传入）"
+            fail=1
+          fi
+
+          check_bool() {
+            case "${!1:-}" in
+              true|false) ;;
+              *) echo "::error::$1 必须为 true/false，当前值：${!1:-（空）}"; fail=1 ;;
+            esac
+          }
+          check_int() {
+            local name="$1" min="$2" max="$3" val="${!1:-}"
+            case "$val" in
+              ''|*[!0-9]*) echo "::error::$name 必须是非负整数，当前值：$val"; fail=1; return ;;
+            esac
+            if [ "$val" -lt "$min" ] || [ "$val" -gt "$max" ]; then
+              echo "::error::$name 需在 [$min, $max] 范围内，当前值：$val"
+              fail=1
+            fi
+          }
+
+          check_bool FREE_DISK_SPACE
+          check_bool SETUP_SWAP
+          check_bool CCACHE_ENABLED
+          check_bool DISABLE_CRYPTO
+          check_bool ALLOW_MISSING_DEPENDENCIES
+          check_bool UPLOAD_ARTIFACT
+          check_bool PUBLISH_RELEASE
+          check_bool RELEASE_PRERELEASE
+          check_bool DEPENDENCIES_LOCAL_MANIFEST
+          check_int MANIFEST_DEPTH 0 2147483647
+          check_int REPO_SYNC_JOBS 0 128
+          check_int REPO_SYNC_RETRIES 1 10
+          check_int MAKE_JOBS 0 128
+          check_int ARTIFACT_RETENTION_DAYS 1 90
+          check_int KEEP_RELEASES 0 1000
+          check_int MIN_IMAGE_SIZE_MB 0 65536
+
+          # 公共设备树：URL 与路径必须成对出现
+          if [ -n "${COMMON_TREE_URL:-}" ] && [ -z "${COMMON_TREE_PATH:-}" ]; then
+            echo "::error::已提供 common_tree_url 但缺少 common_tree_path"
+            fail=1
+          fi
+
+          # build_env 必须是对象，且键名可安全 export
+          if ! jq -e '(.build_env // {}) | type == "object"' "$CONFIG_PATH" >/dev/null 2>&1; then
+            echo "::error::build_env 必须是 JSON 对象"
+            fail=1
+          else
+            bad="$(jq -r '(.build_env // {}) | keys[] | select(test("^[A-Za-z_][A-Za-z0-9_]*$") | not)' "$CONFIG_PATH")"
+            if [ -n "$bad" ]; then
+              echo "::error::build_env 含非法变量名：$(echo "$bad" | tr '\n' ' ')"
+              fail=1
+            fi
+          fi
+
+          if [ "$fail" -ne 0 ]; then
+            echo "配置校验未通过，已终止。"
+            exit 1
+          fi
+
+          # 配置摘要，便于在 Actions 运行页直接核对本次参数
+          {
+            echo "## 构建配置"
+            echo ""
+            echo "| 键 | 值 |"
+            echo "| --- | --- |"
+            jq -r 'to_entries[] | "| \(.key) | `\(.value | tostring)` |"' "$CONFIG_PATH"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${VALIDATE_ONLY:-false}" = "true" ]; then
+            echo "validate_only=true：配置校验通过，跳过实际构建。"
+            echo ""
+            echo "> validate_only = true，本次未执行构建。" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Free disk space
+        if: ${{ env.VALIDATE_ONLY != 'true' && env.FREE_DISK_SPACE == 'true' }}
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/share/boost /opt/hostedtoolcache/CodeQL || true
+          sudo -E apt-get clean
+          df -h /
+
+      - name: Install build dependencies
+        if: ${{ env.VALIDATE_ONLY != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -E apt-get -qq update
+          # 基础依赖：ubuntu-22.04 / 24.04 均提供，失败时逐个安装并跳过缺失项。
+          # 如需其它工具链可在 config.extra_packages 追加。
+          BASE_PKGS="bc bison build-essential ccache curl flex g++-multilib gcc-multilib git git-lfs \
+            gnupg gperf imagemagick lib32readline-dev lib32z1-dev libelf-dev liblz4-tool \
+            libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool \
+            squashfs-tools xsltproc zip zlib1g-dev python3 python-is-python3 libncurses-dev \
+            ${EXTRA_PACKAGES:-}"
+
+          # 兼容依赖：24.04 已移除（或 legacy 分支才需要），装不上只告警不中断。
+          # openjdk-8 仅在未通过 config.java_version 指定 JDK 时尝试安装。
+          COMPAT_PKGS="libncurses5 libtinfo5 lib32ncurses5-dev"
+          if [ -z "${JAVA_VERSION:-}" ]; then
+            COMPAT_PKGS="$COMPAT_PKGS openjdk-8-jdk"
+          fi
+
+          if ! sudo -E DEBIAN_FRONTEND=noninteractive apt-get -qq install -y $BASE_PKGS; then
+            echo "批量安装失败，改为逐个安装并跳过当前镜像不提供的包"
+            for p in $BASE_PKGS; do
+              sudo -E DEBIAN_FRONTEND=noninteractive apt-get -qq install -y "$p" \
+                || echo "::warning::依赖 $p 不可用，已跳过"
+            done
+          fi
+
+          for p in $COMPAT_PKGS; do
+            sudo -E DEBIAN_FRONTEND=noninteractive apt-get -qq install -y "$p" \
+              || echo "::warning::兼容依赖 $p 在当前镜像（$(. /etc/os-release && echo "$PRETTY_NAME")）不可用，已跳过"
+          done
+
+      - name: Setup JDK
+        if: ${{ env.VALIDATE_ONLY != 'true' && env.JAVA_VERSION != '' }}
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Add swap
+        if: ${{ env.VALIDATE_ONLY != 'true' && env.SETUP_SWAP == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          size="${SWAP_SIZE:-8G}"
+          bytes="$(numfmt --from=iec "$size")"
+          mb=$(( bytes / 1024 / 1024 ))
+          sudo swapoff -a || true
+          sudo rm -f /swapfile
+          sudo fallocate -l "${mb}M" /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count="$mb"
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
+      - name: Install repo launcher
+        if: ${{ env.VALIDATE_ONLY != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/bin"
+          curl -fsSL https://storage.googleapis.com/git-repo-downloads/repo -o "$HOME/bin/repo"
+          chmod a+x "$HOME/bin/repo"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+          echo "repo version: $("$HOME/bin/repo" --version | head -n1)"
+
+      - name: Init and sync manifest
+        if: ${{ env.VALIDATE_ONLY != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$WORKSPACE_DIR"
+          cd "$WORKSPACE_DIR"
+
+          init_args=()
+          if [ "${MANIFEST_DEPTH:-0}" -gt 0 ]; then
+            init_args+=("--depth=${MANIFEST_DEPTH}")
+          fi
+          if [ -n "${MANIFEST_GROUPS:-}" ]; then
+            init_args+=("--groups=${MANIFEST_GROUPS}")
+          fi
+
+          echo "::group::repo init"
+          repo init -u "$MANIFEST_URL" -b "$MANIFEST_BRANCH" "${init_args[@]}"
+          echo "::endgroup::"
+
+          jobs="${REPO_SYNC_JOBS:-0}"
+          [ "$jobs" -gt 0 ] || jobs="$(nproc --all)"
+          retries="${REPO_SYNC_RETRIES:-3}"
+
+          echo "::group::repo sync (-j$jobs, 最多 $retries 次)"
+          ok=0
+          for attempt in $(seq 1 "$retries"); do
+            if repo sync -c -j"$jobs" --force-sync --no-clone-bundle --no-tags; then
+              echo "repo sync 成功（第 $attempt 次）"
+              ok=1
+              break
+            fi
+            echo "::warning::repo sync 失败（第 $attempt/$retries 次）"
+            if [ "$attempt" -lt "$retries" ]; then sleep 15; fi
+          done
+          echo "::endgroup::"
+          [ "$ok" -eq 1 ] || { echo "::error::repo sync 连续 $retries 次失败"; exit 1; }
+
+      - name: Sync device tree
+        if: ${{ env.VALIDATE_ONLY != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$WORKSPACE_DIR"
+          retries="${REPO_SYNC_RETRIES:-3}"
+
+          # 通用克隆函数：带重试、可选分支；空 URL 直接跳过
+          clone_tree() {
+            local url="$1" branch="$2" path="$3" label="$4"
+            [ -n "$url" ] || return 0
+            if [ -z "$path" ]; then
+              echo "::error::$label 已提供地址但缺少目标路径"
+              return 1
+            fi
+            mkdir -p "$(dirname "$path")"
+            rm -rf "$path"
+            local args=()
+            if [ -n "$branch" ]; then
+              args=(-b "$branch")
+            fi
+            local attempt ok=0
+            for attempt in $(seq 1 "$retries"); do
+              if git clone "$url" "${args[@]}" --depth=1 --single-branch "$path"; then
+                ok=1
+                break
+              fi
+              echo "::warning::$label 同步失败（第 $attempt/$retries 次）"
+              rm -rf "$path"
+              if [ "$attempt" -lt "$retries" ]; then sleep 15; fi
+            done
+            [ "$ok" -eq 1 ] || { echo "::error::$label 连续 $retries 次同步失败"; return 1; }
+            git -C "$path" log -1 --oneline
+          }
+
+          clone_tree "$DEVICE_TREE_URL" "${DEVICE_TREE_BRANCH:-}" "$DEVICE_TREE_PATH" "设备树"
+          clone_tree "${COMMON_TREE_URL:-}" "${COMMON_TREE_BRANCH:-}" "${COMMON_TREE_PATH:-}" "公共设备树"
+
+          # 可选：把设备树的 *.dependencies 转成 local manifest，再补一次 sync 拉齐依赖仓库
+          if [ "${DEPENDENCIES_LOCAL_MANIFEST:-false}" = "true" ]; then
+            dep_file="$(find "$DEVICE_TREE_PATH" -maxdepth 2 -name '*.dependencies' -type f | sort | head -n1 || true)"
+            if [ -n "$dep_file" ]; then
+              mkdir -p .repo/local_manifests
+              xml=".repo/local_manifests/roomservice.xml"
+              {
+                echo '<?xml version="1.0" encoding="UTF-8"?>'
+                echo '<manifest>'
+                grep -E '^[[:space:]]*<project' "$dep_file" || true
+                echo '</manifest>'
+              } > "$xml"
+              echo "已由 $(basename "$dep_file") 生成 $xml"
+              jobs="${REPO_SYNC_JOBS:-0}"
+              if [ "$jobs" -le 0 ]; then jobs="$(nproc --all)"; fi
+              repo sync -c -j"$jobs" --force-sync || echo "::warning::依赖仓库同步失败，继续构建"
+            else
+              echo "未找到 *.dependencies，跳过 local manifest 生成"
+            fi
+          fi
+
+          # 可选：执行设备树自带补丁脚本（展锐等 prebuilt / 无源码场景常用）
+          if [ -n "${DEVICE_PATCH_SCRIPT:-}" ]; then
+            patch_target="$DEVICE_TREE_PATH/$DEVICE_PATCH_SCRIPT"
+            if [ -f "$patch_target" ]; then
+              chmod +x "$patch_target"
+              echo "执行设备树补丁脚本：$patch_target"
+              ( cd "$(dirname "$patch_target")" && "./$(basename "$patch_target")" ) || echo "::warning::补丁脚本返回非零，继续构建"
+            else
+              echo "::warning::device_patch_script 指向的脚本不存在：$patch_target"
+            fi
+          fi
+
+
+      - name: Disable crypto
+        if: ${{ env.VALIDATE_ONLY != 'true' && env.DISABLE_CRYPTO == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$WORKSPACE_DIR/$DEVICE_TREE_PATH"
+          while IFS= read -r f; do
+            sed -i -E 's/^[[:space:]]*TW_INCLUDE_CRYPTO[[:space:]]*:?=.*/TW_INCLUDE_CRYPTO := false/' "$f"
+            sed -i -E 's/^[[:space:]]*TW_INCLUDE_CRYPTO_FBE[[:space:]]*:?=.*/TW_INCLUDE_CRYPTO_FBE := false/' "$f"
+          done < <(find . -maxdepth 2 -name 'BoardConfig*.mk')
+          grep -R "TW_INCLUDE_CRYPTO" . || true
+
+      - name: Setup ccache
+        if: ${{ env.VALIDATE_ONLY != 'true' && env.CCACHE_ENABLED == 'true' }}
+        uses: hendrikmuhs/ccache-action@v1.2.24
+        with:
+          key: recovery-${{ env.DEVICE }}-${{ env.MANIFEST_BRANCH }}
+          max-size: ${{ env.CCACHE_MAX_SIZE }}
+
+      - name: Build
+        if: ${{ env.VALIDATE_ONLY != 'true' }}
+        shell: bash
+        run: |
+          set -eo pipefail
+          cd "$WORKSPACE_DIR"
+
+          echo "::group::envsetup"
+          set +u
+          source build/envsetup.sh
+          set -u
+          echo "::endgroup::"
+
+          if [ "${ALLOW_MISSING_DEPENDENCIES:-false}" = "true" ]; then
+            export ALLOW_MISSING_DEPENDENCIES=true
+          fi
+
+          # 可选：repopick 指定 Gerrit change（依赖 envsetup 提供的 repopick 函数）
+          if [ -n "${REPOPICK_PATCHES:-}" ]; then
+            echo "::group::repopick $REPOPICK_PATCHES"
+            set +u
+            repopick -g "${REPOPICK_GERRIT:-https://gerrit.twrp.me}" $REPOPICK_PATCHES
+            set -u
+            echo "::endgroup::"
+          fi
+
+          # config.build_env 中的附加变量（仅在本步骤生效）
+          if [ -n "${BUILD_ENV_JSON:-}" ] && [ "$BUILD_ENV_JSON" != "{}" ]; then
+            while IFS= read -r k; do
+              v="$(printf '%s' "$BUILD_ENV_JSON" | jq -r --arg k "$k" '.[$k] | tostring')"
+              export "$k=$v"
+              echo "build_env: $k=$v"
+            done < <(printf '%s' "$BUILD_ENV_JSON" | jq -r 'keys[]')
+          fi
+
+          # lunch 前缀未配置时按 manifest 推导：omni 清单用 omni_，其余（aosp 系）用 twrp_
+          lunch_prefix="${LUNCH_PREFIX:-}"
+          if [ -z "$lunch_prefix" ]; then
+            case "$MANIFEST_URL" in
+              *omni*) lunch_prefix="omni" ;;
+              *)      lunch_prefix="twrp" ;;
+            esac
+            echo "lunch_prefix 未配置，按 manifest 推导为 $lunch_prefix"
+          fi
+
+          lunch_target="${LUNCH_TARGET:-}"
+          if [ -z "$lunch_target" ]; then
+            lunch_target="${lunch_prefix}_${DEVICE}-${LUNCH_VARIANT}"
+          fi
+
+          echo "::group::lunch $lunch_target"
+          set +u
+          lunch "$lunch_target"
+          set -u
+          echo "::endgroup::"
+
+          # 构建目标归一化：recovery → recoveryimage，vendor_boot → vendorbootimage
+          build_target="${BUILD_TARGET:-recoveryimage}"
+          case "$build_target" in
+            *image) ;;
+            *) build_target="${build_target//[-_]/}image" ;;
+          esac
+          echo "BUILD_TARGET_NORMALIZED=$build_target" >> "$GITHUB_ENV"
+
+          jobs="${MAKE_JOBS:-0}"
+          echo "::group::mka $build_target"
+          if [ "$jobs" -gt 0 ]; then
+            mka -j"$jobs" "$build_target"
+          else
+            mka "$build_target"
+          fi
+          echo "::endgroup::"
+
+      - name: Collect and package output
+        id: pack
+        if: ${{ env.VALIDATE_ONLY != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$WORKSPACE_DIR/out/target/product/$DEVICE"
+          if [ ! -d "$OUT" ]; then
+            echo "::error::产物目录不存在：$OUT（请检查 device 与 build_target）"
+            exit 1
+          fi
+
+          IMG="$(find "$OUT" -maxdepth 1 -type f -name "${IMAGE_GLOB:-recovery*.img}" | sort | head -n1 || true)"
+          if [ -z "$IMG" ]; then
+            echo "::error::未匹配到产物文件（image_glob=${IMAGE_GLOB}），目录内容如下："
+            find "$OUT" -maxdepth 1 -type f \( -name '*.img' -o -name '*.zip' \) || true
+            exit 1
+          fi
+
+          size_mb=$(( $(stat -c%s "$IMG") / 1024 / 1024 ))
+          min_mb="${MIN_IMAGE_SIZE_MB:-0}"
+          if [ "$min_mb" -gt 0 ] && [ "$size_mb" -lt "$min_mb" ]; then
+            echo "::error::产物体积异常：$(basename "$IMG") 仅 ${size_mb}MB，低于 min_image_size_mb=${min_mb}"
+            exit 1
+          fi
+
+          DATETIME="$(TZ="${TZ:-Asia/Shanghai}" date +%Y%m%d-%H%M)"
+          SAFE_NAME="$RECOVERY_NAME"
+          SAFE_NAME="${SAFE_NAME// /-}"
+          SAFE_NAME="${SAFE_NAME//\//-}"
+          TAG="${DEVICE}-${SAFE_NAME}-${DATETIME}-${GITHUB_RUN_NUMBER}"
+          ZIP_NAME="${SAFE_NAME}_${DEVICE}_${DATETIME}_${GITHUB_RUN_NUMBER}.zip"
+
+          pushd "$OUT" >/dev/null
+          rm -f "$ZIP_NAME" "$ZIP_NAME.sha256"
+
+          # 附加产物（可选）：按 extra_artifacts_glob 收集，路径相对产物目录
+          extra_files=()
+          for g in ${EXTRA_ARTIFACTS_GLOB:-}; do
+            while IFS= read -r f; do
+              if [ -n "$f" ]; then extra_files+=("$f"); fi
+            done < <(find . -maxdepth 3 -type f -name "$g" 2>/dev/null | sed 's|^\./||' | sort || true)
+          done
+
+          zip -r9 "$ZIP_NAME" "$(basename "$IMG")"
+          if [ "${#extra_files[@]}" -gt 0 ]; then
+            echo "附加产物："
+            printf '  %s\n' "${extra_files[@]}"
+            zip -9 "$ZIP_NAME" "${extra_files[@]}"
+          fi
+          cat > build_info.txt <<EOF
+          recovery_name: $RECOVERY_NAME
+          recovery_version: $RECOVERY_VERSION
+          device: $DEVICE
+          manifest: $MANIFEST_URL @ $MANIFEST_BRANCH
+          device_tree: $DEVICE_TREE_URL @ ${DEVICE_TREE_BRANCH:-<default>}
+          build_target: ${BUILD_TARGET_NORMALIZED:-$BUILD_TARGET}
+          built_at: $DATETIME (${TZ:-Asia/Shanghai})
+          commit: $GITHUB_SHA
+          run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          image: $(basename "$IMG") (${size_mb}MB)
+          EOF
+          zip -9 "$ZIP_NAME" build_info.txt
+          sha256sum "$ZIP_NAME" > "$ZIP_NAME.sha256"
+          popd >/dev/null
+
+          {
+            echo "tag=$TAG"
+            echo "datetime=$DATETIME"
+            echo "out_dir=$OUT"
+            echo "zip_path=$OUT/$ZIP_NAME"
+            echo "zip_name=$ZIP_NAME"
+            echo "sha_path=$OUT/$ZIP_NAME.sha256"
+            echo "img_name=$(basename "$IMG")"
+            echo "img_size_mb=$size_mb"
+            echo "artifact=${ARTIFACT_NAME:-${RECOVERY_NAME}_${DEVICE}-${GITHUB_RUN_NUMBER}}"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo ""
+            echo "## 构建产物"
+            echo ""
+            echo "| 项目 | 值 |"
+            echo "| --- | --- |"
+            echo "| 镜像 | \`$(basename "$IMG")\` (${size_mb}MB) |"
+            echo "| 压缩包 | \`$ZIP_NAME\` |"
+            echo "| 来源 | \`$MANIFEST_URL\` @ \`$MANIFEST_BRANCH\` |"
+            echo "| 设备树 | \`$DEVICE_TREE_URL\` @ \`${DEVICE_TREE_BRANCH:-<default>}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          ls -lh "$OUT"
+          df -hT /
+
+      - name: Upload artifact
+        if: ${{ env.VALIDATE_ONLY != 'true' && env.UPLOAD_ARTIFACT == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.pack.outputs.artifact }}
+          path: |
+            ${{ steps.pack.outputs.zip_path }}
+            ${{ steps.pack.outputs.sha_path }}
+          retention-days: ${{ fromJSON(env.ARTIFACT_RETENTION_DAYS) }}
+          if-no-files-found: error
+
+      - name: Publish release
+        if: ${{ env.VALIDATE_ONLY != 'true' && env.PUBLISH_RELEASE == 'true' }}
+        uses: softprops/action-gh-release@v3
+        with:
+          token: ${{ github.token }}
+          tag_name: ${{ steps.pack.outputs.tag }}
+          name: ${{ env.RECOVERY_NAME }} ${{ env.RECOVERY_VERSION }} | ${{ env.DEVICE }} | ${{ steps.pack.outputs.datetime }}
+          prerelease: ${{ env.RELEASE_PRERELEASE == 'true' }}
+          files: |
+            ${{ steps.pack.outputs.zip_path }}
+            ${{ steps.pack.outputs.sha_path }}
+          body: |
+            **${{ env.RECOVERY_NAME }} ${{ env.RECOVERY_VERSION }}** for `${{ env.DEVICE }}`
+
+            | 项目 | 值 |
+            | --- | --- |
+            | 构建时间 | ${{ steps.pack.outputs.datetime }} (${{ env.TZ }}) |
+            | 源码 | `${{ env.MANIFEST_URL }}` @ `${{ env.MANIFEST_BRANCH }}` |
+            | 设备树 | `${{ env.DEVICE_TREE_URL }}` @ `${{ env.DEVICE_TREE_BRANCH }}` |
+            | 构建目标 | `${{ env.BUILD_TARGET }}` |
+            | 提交 | `${{ github.sha }}` |
+            | 运行 | [actions/runs/${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+
+            下载：[${{ steps.pack.outputs.zip_name }}](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ steps.pack.outputs.tag }}/${{ steps.pack.outputs.zip_name }})
+
+            校验：`sha256sum -c ${{ steps.pack.outputs.zip_name }}.sha256`
+
+            ${{ env.RELEASE_NOTES_EXTRA }}
+
+            > 由 GitHub Actions 自动构建，非官方发布，刷机风险自负。
+
+      - name: Delete old releases
+        if: ${{ env.VALIDATE_ONLY != 'true' && env.PUBLISH_RELEASE == 'true' && env.KEEP_RELEASES != '0' }}
+        uses: dev-drprasad/delete-older-releases@v0.3.4
+        with:
+          keep_latest: ${{ fromJSON(env.KEEP_RELEASES) }}
+          delete_tags: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

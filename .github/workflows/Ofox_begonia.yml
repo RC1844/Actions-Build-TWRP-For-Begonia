@@ -82,23 +82,20 @@ jobs:
         run: tree -C -d -L 3
 
       - name: Restore cache
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         if: (github.event.inputs.Enable_cache == 'true' && github.event.inputs.Enable_cache  != 'false') || contains(github.event.action, 'Enable_cache')
         with:
           path: |
-            ~/.ccache
             ${{env.WorkSpace}}/out
           key: ${{runner.os}}-${{env.Rec_name}}-${{env.Rec_ver}}-${{env.device}}
           restore-keys: |
             ${{runner.os}}-${{env.Rec_name}}-${{env.Rec_ver}}-${{env.device}}
 
       - name: Setup ccache
-        uses: alexjurkiewicz/setup-ccache@master
+        uses: hendrikmuhs/ccache-action@v1.2.24
         if: (github.event.inputs.Enable_cache == 'true' && github.event.inputs.Enable_cache  != 'false') || contains(github.event.action, 'Enable_cache')
         with:
           max-size: 5G
-          extra-config: |
-            keep_comments_cpp = true
 
       - name: Build ${{env.Rec_name}}
         run: |
@@ -126,8 +123,8 @@ jobs:
       - name: Get info
         id: info
         run: |
-          echo "::set-output name=date::$(/bin/date -u "+%Y-%m-%d-%H-%M")"
-          echo "::set-output name=OutFolder::"${{env.WorkSpace}}/out/target/product/${{env.device}}""
+          echo "date=$(/bin/date -u "+%Y-%m-%d-%H-%M")" >> "$GITHUB_OUTPUT"
+          echo "OutFolder=${{env.WorkSpace}}/out/target/product/${{env.device}}" >> "$GITHUB_OUTPUT"
         shell: bash
 
       - name: Show Space Info
@@ -146,13 +143,13 @@ jobs:
           echo "::endgroup::"
 
       - name: Upload firmware directory
-        uses: actions/upload-artifact@main
+        uses: actions/upload-artifact@v7
         with:
           name: ${{env.Rec_name}}_for_${{env.device}}-${{github.run_id}}
           path: ${{steps.info.outputs.OutFolder}}/*.img
 
       - name: Upload Release
-        uses: softprops/action-gh-release@master
+        uses: softprops/action-gh-release@v3
         with:
           prerelease: true
           files: |
@@ -163,12 +160,12 @@ jobs:
           body: |
             ${{env.Rec_name}}-${{env.Rec_ver}} for ${{env.device}} build at ${{steps.info.outputs.date}}
             Actions:[${{github.run_id}}](${{github.server_url}}/${{github.repository}}/actions/runs/${{github.run_id}})
-            Download:[${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}_${{github.run_id}}.zip](https://download.fastgit.org/${{github.repository}}/releases/download/${{env.device}}-${{env.Rec_name}}-${{steps.info.outputs.date}}/${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}_${{github.run_id}}.zip)
+            Download:[${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}_${{github.run_id}}.zip](https://github.com/${{github.repository}}/releases/download/${{env.device}}-${{env.Rec_name}}-${{steps.info.outputs.date}}/${{env.Rec_name}}_for_${{env.device}}_by_${{env.Author}}_${{github.run_id}}.zip)
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
       - name: Remove old Releases
-        uses: dev-drprasad/delete-older-releases@v0.1.0
+        uses: dev-drprasad/delete-older-releases@v0.3.4
         if: (github.event.inputs.Delete_oldReleases == 'true' && github.event.inputs.Delete_oldReleases  != 'false') || contains(github.event.action, 'Delete_oldReleases')
         with:
           keep_latest: 12
