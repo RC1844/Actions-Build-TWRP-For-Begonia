@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recovery 构建配置编辑器</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --surface:#ffffff; --surface-muted:#eef0f4; --border:#d7dbe2;
+    --text:#1b2028; --text-muted:#5c6572; --brand:#0f7a4a; --brand-weak:#e5f4ec;
+    --danger:#b42318; --danger-weak:#fdeceb;
+    --radius:10px;
+    --font:ui-sans-serif,system-ui,"Segoe UI","Microsoft YaHei",sans-serif;
+    --mono:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14171c; --surface:#1b1f26; --surface-muted:#232830; --border:#323843;
+      --text:#e6e9ee; --text-muted:#9aa4b2; --brand:#3ddc97; --brand-weak:#14301f;
+      --danger:#ff8a80; --danger-weak:#3a1c1b;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--text); font-family:var(--font);
+    font-size:14px; line-height:1.5; display:flex; flex-direction:column;
+  }
+  header{
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    padding:10px 16px; background:var(--surface); border-bottom:1px solid var(--border);
+  }
+  header .brand{font-weight:600; font-size:15px}
+  header .brand small{font-weight:400; color:var(--text-muted); margin-left:8px; font-size:12px}
+  header .actions{margin-left:auto; display:flex; gap:8px; flex-wrap:wrap}
+  button{
+    font:inherit; font-size:13px; padding:6px 12px; border-radius:8px;
+    border:1px solid var(--border); background:var(--surface); color:var(--text); cursor:pointer;
+  }
+  button:hover{background:var(--surface-muted)}
+  button.primary{background:var(--brand); border-color:var(--brand); color:#fff}
+  button.primary:hover{filter:brightness(1.06)}
+  button.danger{color:var(--danger); border-color:var(--danger)}
+  button.danger:hover{background:var(--danger-weak)}
+  main{flex:1; min-height:0; display:flex}
+  aside{
+    width:264px; flex:0 0 264px; border-right:1px solid var(--border); background:var(--surface);
+    display:flex; flex-direction:column; min-height:0;
+  }
+  .aside-head{
+    padding:10px 14px; font-size:12px; color:var(--text-muted); letter-spacing:.04em;
+    text-transform:uppercase; border-bottom:1px solid var(--border);
+  }
+  #preset-list{list-style:none; margin:0; padding:6px; overflow:auto; flex:1}
+  #preset-list li{margin:2px 0}
+  #preset-list button{
+    width:100%; text-align:left; border:1px solid transparent; background:transparent;
+    padding:8px 10px; display:block; border-radius:8px;
+  }
+  #preset-list button.active{background:var(--brand-weak); border-color:var(--brand)}
+  #preset-list .id{display:block; font-family:var(--mono); font-size:12.5px}
+  #preset-list .name{display:block; font-size:12px; color:var(--text-muted); margin-top:2px}
+  aside .tip{
+    margin:0; padding:10px 14px; border-top:1px solid var(--border);
+    font-size:12px; color:var(--text-muted);
+  }
+  section.editor{flex:1; min-width:0; overflow:auto; padding:16px 20px 40px}
+  .basic{
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:12px 14px; display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end;
+  }
+  .basic .f{display:flex; flex-direction:column; gap:4px; min-width:200px; flex:1}
+  .basic label{font-size:12px; color:var(--text-muted)}
+  .basic input{
+    font:inherit; font-size:13px; padding:6px 8px; border-radius:8px;
+    border:1px solid var(--border); background:var(--bg); color:var(--text);
+  }
+  .basic .btns{display:flex; gap:8px}
+  .group{
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:14px 16px 6px; margin-top:14px;
+  }
+  .group h2{margin:0 0 10px; font-size:13px; font-weight:600; color:var(--text-muted); letter-spacing:.03em}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:10px 18px}
+  .field{padding:4px 0 8px; min-width:0}
+  .field.wide{grid-column:1/-1}
+  .field-head{display:flex; align-items:baseline; gap:8px; flex-wrap:wrap}
+  .field-head label{font-size:13px; font-weight:500}
+  .field-head label em{
+    font-style:normal; font-size:11px; color:var(--danger); border:1px solid var(--danger);
+    border-radius:4px; padding:0 3px; margin-left:6px; vertical-align:1px;
+  }
+  .field-head code{
+    font-family:var(--mono); font-size:11.5px; color:var(--text-muted);
+    background:var(--surface-muted); border-radius:4px; padding:0 4px;
+  }
+  .field input[type=text],.field input[type=number],.field textarea{
+    width:100%; margin-top:4px; font:inherit; font-size:13px; padding:6px 8px;
+    border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text);
+  }
+  .field textarea{font-family:var(--mono); font-size:12.5px; resize:vertical}
+  .field input:focus,.field textarea:focus,.basic input:focus{outline:2px solid var(--brand); outline-offset:-1px}
+  .field.invalid input,.field.invalid textarea{border-color:var(--danger)}
+  .hint{font-size:12px; color:var(--text-muted); margin-top:4px}
+  .field-error{font-size:12px; color:var(--danger); margin-top:4px}
+  .field-error:empty{display:none}
+  .switch{display:inline-flex; align-items:center; gap:8px; margin-top:6px; cursor:pointer; user-select:none}
+  .switch input{position:absolute; opacity:0; width:0; height:0}
+  .switch .track{
+    width:36px; height:20px; border-radius:999px; background:var(--border);
+    position:relative; transition:background .15s ease; flex:0 0 auto;
+  }
+  .switch .track::after{
+    content:""; position:absolute; top:2px; left:2px; width:16px; height:16px;
+    border-radius:50%; background:#fff; transition:transform .15s ease;
+  }
+  .switch input:checked + .track{background:var(--brand)}
+  .switch input:checked + .track::after{transform:translateX(16px)}
+  .switch input:focus-visible + .track{outline:2px solid var(--brand); outline-offset:2px}
+  .switch .switch-text{font-size:12.5px; color:var(--text-muted)}
+  .output{
+    margin-top:16px; background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--radius); padding:12px 14px 14px;
+  }
+  .output-head{display:flex; align-items:center; gap:10px; margin-bottom:8px}
+  .output-head span{font-size:13px; font-weight:600}
+  .output-head button{margin-left:auto; font-size:12px; padding:4px 10px}
+  #preview{
+    margin:0; padding:10px 12px; max-height:340px; overflow:auto;
+    background:var(--bg); border:1px solid var(--border); border-radius:8px;
+    font-family:var(--mono); font-size:12px; line-height:1.55; white-space:pre;
+  }
+  #issues{margin-top:8px; font-size:12.5px}
+  #issues ul{margin:4px 0 0; padding-left:18px; color:var(--danger)}
+  #issues .ok{color:var(--text-muted)}
+  .note{margin-top:14px; font-size:12px; color:var(--text-muted); line-height:1.7}
+  .note code{font-family:var(--mono); background:var(--surface-muted); padding:0 4px; border-radius:4px}
+  @media (max-width:880px){
+    main{flex-direction:column}
+    aside{width:auto; flex:0 0 auto; border-right:0; border-bottom:1px solid var(--border)}
+    #preset-list{max-height:180px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Recovery 构建配置<small>生成 .github/recovery-profiles.json</small></div>
+  <div class="actions">
+    <button id="btn-import">导入 JSON</button>
+    <input id="file-input" type="file" accept=".json,application/json" hidden>
+    <button id="btn-copy">复制 JSON</button>
+    <button id="btn-export" class="primary">导出 JSON</button>
+  </div>
+</header>
+
+<main>
+  <aside>
+    <div class="aside-head">预设 <span id="count"></span></div>
+    <ul id="preset-list"></ul>
+    <button id="btn-add" style="margin:8px 12px">+ 新建预设</button>
+    <p class="tip">预设保存在本机浏览器中，导出后替换仓库里的 .github/recovery-profiles.json。</p>
+  </aside>
+
+  <section class="editor">
+    <div class="basic">
+      <div class="f">
+        <label for="f-profile">预设 ID（profile，用于下拉选择）</label>
+        <input id="f-profile" type="text" spellcheck="false" placeholder="如 twrp-3.7.0-twrp11">
+      </div>
+      <div class="f">
+        <label for="f-label">显示名称（label）</label>
+        <input id="f-label" type="text" placeholder="如 TWRP 3.7.0 / twrp-11">
+      </div>
+      <div class="btns">
+        <button id="btn-duplicate">复制预设</button>
+        <button id="btn-delete" class="danger">删除</button>
+      </div>
+    </div>
+
+    <div id="sections"></div>
+
+    <div class="output">
+      <div class="output-head">
+        <span>生成的 JSON</span>
+        <span id="save-state" style="font-size:12px;color:var(--text-muted);font-weight:400"></span>
+        <button id="btn-copy-json">复制</button>
+      </div>
+      <pre id="preview"></pre>
+      <div id="issues"></div>
+    </div>
+
+    <p class="note">
+      空白字段表示沿用 build-recovery.yml 内置默认值，不会写进 JSON。<br>
+      导出后覆盖 <code>.github/recovery-profiles.json</code>，再运行
+      <code>python .github/scripts/sync-form.py</code> 同步 begonia.yml 的下拉选项；
+      用 <code>python .github/scripts/sync-form.py --check</code> 可检查是否忘记同步。
+    </p>
+  </section>
+</main>
+
+<script>
+// ---------------------------------------------------------------------------
+// 配置键 schema：与 .github/workflows/build-recovery.yml 头部 C 节保持一致
+// t: string | int | bool | json
+// d: 内置默认值（留空/等于默认值时不写入 JSON）
+// ---------------------------------------------------------------------------
+const SCHEMA = [
+  { group: "基本信息", keys: [
+    { k: "device", label: "设备代号", t: "string", d: "", req: true, hint: "产物命名与默认 lunch 目标" },
+    { k: "recovery_name", label: "Recovery 名称", t: "string", d: "Recovery", opts: ["TWRP", "PBRP", "SHRP", "OrangeFox"], hint: "产物与 Release 展示名" },
+    { k: "recovery_version", label: "版本号", t: "string", d: "", hint: "只写入说明与产物信息" },
+    { k: "timezone", label: "时区", t: "string", d: "Asia/Shanghai", opts: ["Asia/Shanghai", "UTC"], hint: "时间戳与日志时区" }
+  ]},
+  { group: "源码 manifest", keys: [
+    { k: "manifest_url", label: "manifest 地址", t: "string", d: "", req: true, hint: "源码仓库地址" },
+    { k: "manifest_branch", label: "manifest 分支", t: "string", d: "", req: true, hint: "如 twrp-11 / android-11.0" },
+    { k: "manifest_depth", label: "克隆深度", t: "int", d: 1, min: 0, hint: "repo init --depth；0 = 完整历史" },
+    { k: "manifest_groups", label: "repo groups", t: "string", d: "all,-notdefault,-device,-darwin,-x86,-mips", wide: true, hint: "空字符串在配置里表示不传该参数" },
+    { k: "workspace_dir", label: "工作目录", t: "string", d: "workspace", hint: "相对仓库根目录" }
+  ]},
+  { group: "设备树", keys: [
+    { k: "device_tree_url", label: "设备树地址", t: "string", d: "", req: true },
+    { k: "device_tree_branch", label: "设备树分支", t: "string", d: "", hint: "留空用仓库默认分支" },
+    { k: "device_tree_path", label: "设备树路径", t: "string", d: "", req: true, hint: "如 device/redmi/begonia" },
+    { k: "common_tree_url", label: "公共设备树地址", t: "string", d: "", hint: "多机型共用树时填写" },
+    { k: "common_tree_branch", label: "公共设备树分支", t: "string", d: "" },
+    { k: "common_tree_path", label: "公共设备树路径", t: "string", d: "" },
+    { k: "device_patch_script", label: "补丁脚本", t: "string", d: "", hint: "相对设备树根，如 prebuilt/sourcecode/patch.sh" },
+    { k: "dependencies_local_manifest", label: "转换 dependencies", t: "bool", d: false, hint: "把 *.dependencies 转成 roomservice.xml 并补一次 sync" }
+  ]},
+  { group: "同步与补丁", keys: [
+    { k: "repopick_patches", label: "repopick change 号", t: "string", d: "", wide: true, hint: "空格分隔，envsetup 后、lunch 前执行" },
+    { k: "repopick_gerrit", label: "Gerrit 地址", t: "string", d: "https://gerrit.twrp.me", wide: true },
+    { k: "repo_sync_jobs", label: "repo sync 并发", t: "int", d: 0, min: 0, hint: "0 = CPU 核数" },
+    { k: "repo_sync_retries", label: "同步重试次数", t: "int", d: 3, min: 1, max: 10 }
+  ]},
+  { group: "lunch 与构建", keys: [
+    { k: "lunch_prefix", label: "lunch 前缀", t: "string", d: "", opts: ["twrp", "omni", "aosp"], hint: "留空按 manifest 自动推导" },
+    { k: "lunch_variant", label: "lunch 变体", t: "string", d: "eng", opts: ["eng", "userdebug", "user"] },
+    { k: "lunch_target", label: "完整 lunch 目标", t: "string", d: "", hint: "非空时覆盖 <prefix>_<device>-<variant>" },
+    { k: "build_target", label: "构建目标", t: "string", d: "recoveryimage", opts: ["recoveryimage", "bootimage", "vendor_bootimage"], hint: "也接受 recovery / boot / vendor_boot 简写" },
+    { k: "java_version", label: "JDK 版本", t: "string", d: "", opts: ["8", "11", "17", "21"], hint: "留空沿用镜像自带 JDK" },
+    { k: "make_jobs", label: "mka 并发", t: "int", d: 0, min: 0, hint: "0 = CPU 核数" },
+    { k: "allow_missing_dependencies", label: "允许缺失依赖", t: "bool", d: true, hint: "ALLOW_MISSING_DEPENDENCIES=true" },
+    { k: "disable_crypto", label: "关闭加密", t: "bool", d: false, hint: "关闭 TW_INCLUDE_CRYPTO / FBE" },
+    { k: "build_env", label: "额外环境变量", t: "json", d: {}, wide: true, hint: "JSON 对象，键值均为字符串" }
+  ]},
+  { group: "运行环境", keys: [
+    { k: "free_disk_space", label: "清理预装目录", t: "bool", d: true },
+    { k: "setup_swap", label: "创建 swap", t: "bool", d: true, hint: "作为 OOM 兜底" },
+    { k: "swap_size", label: "swap 大小", t: "string", d: "8G", opts: ["4G", "8G", "12G", "16G"], hint: "支持 K/M/G 后缀" },
+    { k: "extra_packages", label: "额外 apt 包", t: "string", d: "", wide: true, hint: "空格分隔" }
+  ]},
+  { group: "缓存", keys: [
+    { k: "ccache_enabled", label: "启用 ccache", t: "bool", d: true },
+    { k: "ccache_max_size", label: "ccache 上限", t: "string", d: "5G", opts: ["2G", "5G", "10G", "20G"] }
+  ]},
+  { group: "产物与发布", keys: [
+    { k: "upload_artifact", label: "上传 artifact", t: "bool", d: true },
+    { k: "artifact_retention_days", label: "artifact 保留天数", t: "int", d: 14, min: 1, max: 90 },
+    { k: "artifact_name", label: "artifact 名称", t: "string", d: "", hint: "留空自动生成" },
+    { k: "publish_release", label: "发布 Release", t: "bool", d: false, hint: "需要 contents: write" },
+    { k: "release_prerelease", label: "标记预发布", t: "bool", d: true },
+    { k: "keep_releases", label: "保留 Release 数", t: "int", d: 3, min: 0, hint: "0 = 不清理" },
+    { k: "image_glob", label: "产物匹配", t: "string", d: "recovery*.img", hint: "相对 out/target/product/<device>" },
+    { k: "min_image_size_mb", label: "最小体积校验", t: "int", d: 1, min: 0, hint: "单位 MB；0 = 跳过" },
+    { k: "release_notes_extra", label: "追加发布说明", t: "string", d: "", wide: true },
+    { k: "extra_artifacts_glob", label: "额外打包文件", t: "string", d: "", wide: true, hint: "空格分隔，如 \"ramdisk-recovery.* *installer*zip\"" }
+  ]}
+];
+
+const FIELDS = {};
+const KEYS = [];
+for (const g of SCHEMA) for (const f of g.keys) { FIELDS[f.k] = f; KEYS.push(f.k); }
+
+const STORAGE_KEY = "recovery-profiles";
+
+// 仓库现有预设，仅作为首次打开时的种子数据
+const BUILTIN = [
+  { profile: "twrp-3.7.0-twrp11", label: "TWRP 3.7.0 / twrp-11", config: {
+      recovery_name: "TWRP", recovery_version: "3.7.0", device: "begonia",
+      manifest_url: "https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp",
+      manifest_branch: "twrp-11",
+      device_tree_url: "https://github.com/RC1844/twrp_redmi_begonia",
+      device_tree_branch: "MIUI-android-11.0", device_tree_path: "device/redmi/begonia",
+      lunch_prefix: "twrp", publish_release: false } },
+  { profile: "pbrp-3.1.0", label: "PBRP 3.1.0", config: {
+      recovery_name: "PBRP", recovery_version: "3.1.0", device: "begonia",
+      manifest_url: "https://github.com/PitchBlackRecoveryProject/manifest_pb",
+      manifest_branch: "android-11.0",
+      device_tree_url: "https://github.com/RC1844/twrp_redmi_begonia",
+      device_tree_branch: "MIUI-android-11.0", device_tree_path: "device/redmi/begonia",
+      lunch_prefix: "twrp", publish_release: false } },
+  { profile: "shrp-v3_11.0", label: "SHRP v3_11.0", config: {
+      recovery_name: "SHRP", recovery_version: "v3_11.0", device: "begonia",
+      manifest_url: "https://github.com/SHRP/manifest", manifest_branch: "v3_11.0",
+      device_tree_url: "https://github.com/RC1844/twrp_redmi_begonia",
+      device_tree_branch: "MIUI-android-11.0", device_tree_path: "device/redmi/begonia",
+      lunch_prefix: "twrp", publish_release: false } },
+  { profile: "twrp-3.6.0-omni", label: "TWRP 3.6.0 / twrp-10.0 (omni)", config: {
+      recovery_name: "TWRP", recovery_version: "3.6.0", device: "begonia",
+      manifest_url: "https://github.com/RC1844/platform_manifest_twrp_omni",
+      manifest_branch: "twrp-10.0",
+      device_tree_url: "https://github.com/RC1844/twrp_redmi_begonia",
+      device_tree_branch: "MIUI-android-11.0", device_tree_path: "device/redmi/begonia",
+      lunch_prefix: "omni", publish_release: false } }
+];
+
+const state = { profiles: [], current: 0 };
+let envInvalid = false;
+let saveTimer = null;
+
+const els = {
+  list: document.getElementById("preset-list"),
+  count: document.getElementById("count"),
+  sections: document.getElementById("sections"),
+  preview: document.getElementById("preview"),
+  issues: document.getElementById("issues"),
+  saveState: document.getElementById("save-state"),
+  fProfile: document.getElementById("f-profile"),
+  fLabel: document.getElementById("f-label")
+};
+
+function current() { return state.profiles[state.current]; }
+
+function normalizeProfile(raw) {
+  const p = { profile: "", label: "", config: {} };
+  if (typeof raw.profile === "string") p.profile = raw.profile.trim();
+  if (typeof raw.label === "string") p.label = raw.label.trim();
+  if (raw.config && typeof raw.config === "object" && !Array.isArray(raw.config)) {
+    for (const key of KEYS) {
+      const f = FIELDS[key];
+      if (!(key in raw.config)) continue;
+      const v = raw.config[key];
+      if (f.t === "bool") p.config[key] = Boolean(v);
+      else if (f.t === "int") { const n = Number(v); if (Number.isFinite(n)) p.config[key] = Math.trunc(n); }
+      else if (f.t === "json") { if (v && typeof v === "object") p.config[key] = v; }
+      else p.config[key] = String(v);
+    }
+  }
+  if (!p.label) p.label = p.profile;
+  return p;
+}
+
+function loadState() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    if (Array.isArray(raw) && raw.length) {
+      state.profiles = raw.map(normalizeProfile);
+      state.current = 0;
+      return;
+    }
+    if (raw && Array.isArray(raw.profiles) && raw.profiles.length) {
+      state.profiles = raw.profiles.map(normalizeProfile);
+      state.current = Math.min(Math.max(raw.current || 0, 0), state.profiles.length - 1);
+      return;
+    }
+  } catch (e) { /* 损坏的本地数据，回落到内置预设 */ }
+  state.profiles = BUILTIN.map(normalizeProfile);
+  state.current = 0;
+}
+
+function scheduleSave() {
+  els.saveState.textContent = "保存中…";
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ profiles: state.profiles, current: state.current }));
+    els.saveState.textContent = "已保存到本机";
+  }, 250);
+}
+
+// 只输出与默认值不同的键，保持 JSON 精简
+function cleanConfig(config) {
+  const out = {};
+  for (const key of KEYS) {
+    const f = FIELDS[key];
+    if (!(key in config)) continue;
+    const v = config[key];
+    if (f.t === "bool") { if (v !== f.d) out[key] = v; continue; }
+    if (f.t === "int") { if (typeof v === "number" && v !== f.d) out[key] = v; continue; }
+    if (f.t === "json") { if (v && Object.keys(v).length) out[key] = v; continue; }
+    const s = String(v);
+    if (s !== "" && s !== f.d) out[key] = s;
+  }
+  return out;
+}
+
+function exported() {
+  return state.profiles.map(p => ({ profile: p.profile, label: p.label, config: cleanConfig(p.config) }));
+}
+
+function validateProfile(p, checkEnv) {
+  const errs = [];
+  for (const key of KEYS) {
+    const f = FIELDS[key];
+    const v = p.config[key];
+    if (f.req && (v === undefined || String(v).trim() === "")) {
+      errs.push({ key, msg: f.label + "（" + key + "）必填" });
+      continue;
+    }
+    if (f.t === "int" && v !== undefined) {
+      if (typeof v !== "number" || !Number.isInteger(v)) errs.push({ key, msg: key + " 必须是整数" });
+      else if (f.min !== undefined && v < f.min) errs.push({ key, msg: key + " 不能小于 " + f.min });
+      else if (f.max !== undefined && v > f.max) errs.push({ key, msg: key + " 不能大于 " + f.max });
+    }
+  }
+  if (!p.profile.trim()) errs.push({ key: null, msg: "预设 ID 不能为空" });
+  else if (!/^[A-Za-z0-9._-]+$/.test(p.profile)) errs.push({ key: null, msg: "预设 ID 只能包含字母、数字、点、下划线和连字符" });
+  else if (state.profiles.filter(x => x.profile === p.profile).length > 1) errs.push({ key: null, msg: "预设 ID「" + p.profile + "」重复" });
+  if (checkEnv && envInvalid) errs.push({ key: "build_env", msg: "build_env 必须是合法的 JSON 对象" });
+  return errs;
+}
+
+function refresh() {
+  const p = current();
+  const errs = validateProfile(p, true);
+
+  document.querySelectorAll(".field").forEach(el => el.classList.remove("invalid"));
+  document.querySelectorAll(".field-error").forEach(el => { el.textContent = ""; });
+  for (const e of errs) {
+    if (!e.key) continue;
+    const err = document.querySelector('.field-error[data-err-for="' + e.key + '"]');
+    if (err) err.textContent = e.msg;
+    const field = err && err.closest(".field");
+    if (field) field.classList.add("invalid");
+  }
+
+  if (errs.length) {
+    els.issues.innerHTML = '<ul>' + errs.map(e => "<li>" + escapeHtml(e.msg) + "</li>").join("") + "</ul>";
+  } else {
+    els.issues.innerHTML = '<span class="ok">配置完整，可以导出。</span>';
+  }
+
+  els.preview.textContent = JSON.stringify(exported(), null, 2);
+  renderList();
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function renderList() {
+  els.count.textContent = "(" + state.profiles.length + ")";
+  els.list.innerHTML = "";
+  state.profiles.forEach((p, i) => {
+    const li = document.createElement("li");
+    const btn = document.createElement("button");
+    if (i === state.current) btn.className = "active";
+    const id = document.createElement("span");
+    id.className = "id";
+    id.textContent = p.profile || "(未命名)";
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = p.label || "—";
+    btn.append(id, name);
+    btn.addEventListener("click", () => selectProfile(i));
+    li.appendChild(btn);
+    els.list.appendChild(li);
+  });
+}
+
+function buildField(p, f) {
+  const wrap = document.createElement("div");
+  wrap.className = "field" + (f.wide ? " wide" : "");
+
+  const head = document.createElement("div");
+  head.className = "field-head";
+  const lab = document.createElement("label");
+  lab.htmlFor = "k-" + f.k;
+  lab.textContent = f.label;
+  if (f.req) {
+    const em = document.createElement("em");
+    em.textContent = "必填";
+    lab.appendChild(em);
+  }
+  const code = document.createElement("code");
+  code.textContent = f.k;
+  head.append(lab, code);
+  wrap.appendChild(head);
+
+  const ctrl = document.createElement("div");
+  let input;
+
+  if (f.t === "bool") {
+    const box = document.createElement("label");
+    box.className = "switch";
+    input = document.createElement("input");
+    input.type = "checkbox";
+    input.id = "k-" + f.k;
+    const v = f.k in p.config ? p.config[f.k] : f.d;
+    input.checked = Boolean(v);
+    const track = document.createElement("span");
+    track.className = "track";
+    const txt = document.createElement("span");
+    txt.className = "switch-text";
+    txt.textContent = input.checked ? "开启" : "关闭";
+    input.addEventListener("change", () => {
+      txt.textContent = input.checked ? "开启" : "关闭";
+      setValue(p, f, input);
+    });
+    box.append(input, track, txt);
+    ctrl.appendChild(box);
+  } else if (f.t === "json") {
+    input = document.createElement("textarea");
+    input.id = "k-" + f.k;
+    input.rows = 3;
+    input.spellcheck = false;
+    input.placeholder = "{}";
+    input.value = p.config[f.k] ? JSON.stringify(p.config[f.k], null, 2) : "";
+    input.addEventListener("input", () => setValue(p, f, input));
+    ctrl.appendChild(input);
+  } else {
+    input = document.createElement("input");
+    input.type = f.t === "int" ? "number" : "text";
+    input.id = "k-" + f.k;
+    if (f.t === "int") {
+      input.step = "1";
+      if (f.min !== undefined) input.min = String(f.min);
+      if (f.max !== undefined) input.max = String(f.max);
+    }
+    if (f.k in p.config) input.value = String(p.config[f.k]);
+    input.placeholder = f.d === "" ? (f.req ? "必填" : "留空使用默认值") : String(f.d);
+    if (f.opts) input.setAttribute("list", "dl-" + f.k);
+    input.addEventListener("input", () => setValue(p, f, input));
+    ctrl.appendChild(input);
+    if (f.opts) {
+      const dl = document.createElement("datalist");
+      dl.id = "dl-" + f.k;
+      for (const o of f.opts) {
+        const op = document.createElement("option");
+        op.value = o;
+        dl.appendChild(op);
+      }
+      ctrl.appendChild(dl);
+    }
+  }
+  wrap.appendChild(ctrl);
+
+  const hint = document.createElement("div");
+  hint.className = "hint";
+  hint.textContent = f.hint || (f.d !== "" && f.t !== "bool" && f.t !== "json" ? "默认 " + f.d : "");
+  if (hint.textContent) wrap.appendChild(hint);
+
+  const err = document.createElement("div");
+  err.className = "field-error";
+  err.dataset.errFor = f.k;
+  wrap.appendChild(err);
+
+  return wrap;
+}
+
+function setValue(p, f, input) {
+  if (f.t === "bool") {
+    if (input.checked === f.d) delete p.config[f.k];
+    else p.config[f.k] = input.checked;
+  } else if (f.t === "json") {
+    const raw = input.value.trim();
+    if (!raw) {
+      delete p.config[f.k];
+      envInvalid = false;
+    } else {
+      try {
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not object");
+        p.config[f.k] = parsed;
+        envInvalid = false;
+      } catch (e) {
+        envInvalid = true;
+      }
+    }
+  } else if (f.t === "int") {
+    const raw = input.value.trim();
+    if (!raw) delete p.config[f.k];
+    else {
+      const n = Number(raw);
+      if (Number.isFinite(n)) p.config[f.k] = Math.trunc(n);
+    }
+  } else {
+    const raw = input.value;
+    if (raw.trim() === "" || raw === f.d) delete p.config[f.k];
+    else p.config[f.k] = raw;
+  }
+  scheduleSave();
+  refresh();
+}
+
+function renderForm() {
+  const p = current();
+  envInvalid = false;
+  els.fProfile.value = p.profile;
+  els.fLabel.value = p.label;
+  els.sections.innerHTML = "";
+  for (const g of SCHEMA) {
+    const sec = document.createElement("section");
+    sec.className = "group";
+    const h = document.createElement("h2");
+    h.textContent = g.group;
+    const grid = document.createElement("div");
+    grid.className = "grid";
+    for (const f of g.keys) grid.appendChild(buildField(p, f));
+    sec.append(h, grid);
+    els.sections.appendChild(sec);
+  }
+  refresh();
+}
+
+function selectProfile(i) {
+  if (i === state.current) return;
+  state.current = i;
+  renderForm();
+  scheduleSave();
+}
+
+function addProfile() {
+  let name = "profile";
+  let n = 2;
+  while (state.profiles.some(p => p.profile === name)) name = "profile-" + n++;
+  state.profiles.push({ profile: name, label: "新预设", config: {} });
+  state.current = state.profiles.length - 1;
+  renderForm();
+  scheduleSave();
+  els.fProfile.focus();
+  els.fProfile.select();
+}
+
+function duplicateProfile() {
+  const p = current();
+  let name = (p.profile || "profile") + "-copy";
+  let n = 2;
+  while (state.profiles.some(x => x.profile === name)) name = (p.profile || "profile") + "-copy" + n++;
+  state.profiles.splice(state.current + 1, 0, {
+    profile: name,
+    label: p.label ? p.label + " 副本" : "副本",
+    config: JSON.parse(JSON.stringify(p.config))
+  });
+  state.current += 1;
+  renderForm();
+  scheduleSave();
+}
+
+function deleteProfile() {
+  if (state.profiles.length <= 1) {
+    alert("至少保留一个预设");
+    return;
+  }
+  const p = current();
+  if (!confirm("确定删除预设「" + (p.profile || "(未命名)") + "」？")) return;
+  state.profiles.splice(state.current, 1);
+  state.current = Math.min(state.current, state.profiles.length - 1);
+  renderForm();
+  scheduleSave();
+}
+
+function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    return navigator.clipboard.writeText(text).then(() => true, () => fallbackCopy(text));
+  }
+  return Promise.resolve(fallbackCopy(text));
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+  ta.remove();
+  return ok;
+}
+
+function exportJson() {
+  const errors = [];
+  for (const p of state.profiles) {
+    const errs = validateProfile(p, false);
+    if (errs.length) errors.push((p.profile || "(未命名)") + "：" + errs.map(e => e.msg).join("；"));
+  }
+  if (errors.length) {
+    alert("还有问题需要修复：\n\n" + errors.join("\n"));
+    return;
+  }
+  const data = JSON.stringify(exported(), null, 2) + "\n";
+  const blob = new Blob([data], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "recovery-profiles.json";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function importJson(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let parsed;
+    try {
+      parsed = JSON.parse(String(reader.result));
+    } catch (e) {
+      alert("文件不是合法的 JSON");
+      return;
+    }
+    const list = Array.isArray(parsed) ? parsed : (parsed && Array.isArray(parsed.profiles) ? parsed.profiles : null);
+    if (!list || !list.length) {
+      alert("没找到预设数组：应为 [{ profile, label, config }]");
+      return;
+    }
+    const profiles = list.map(normalizeProfile).filter(p => p.profile);
+    if (!profiles.length) {
+      alert("数组里没有任何带 profile 字段的预设");
+      return;
+    }
+    if (!confirm("导入将替换当前的 " + state.profiles.length + " 个预设，继续？")) return;
+    state.profiles = profiles;
+    state.current = 0;
+    renderForm();
+    scheduleSave();
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById("btn-add").addEventListener("click", addProfile);
+document.getElementById("btn-duplicate").addEventListener("click", duplicateProfile);
+document.getElementById("btn-delete").addEventListener("click", deleteProfile);
+document.getElementById("btn-export").addEventListener("click", exportJson);
+document.getElementById("btn-import").addEventListener("click", () => document.getElementById("file-input").click());
+document.getElementById("file-input").addEventListener("change", e => {
+  const file = e.target.files && e.target.files[0];
+  if (file) importJson(file);
+  e.target.value = "";
+});
+document.getElementById("btn-copy-json").addEventListener("click", () => {
+  copyText(els.preview.textContent).then(ok => {
+    if (ok) els.saveState.textContent = "已复制 JSON";
+  });
+});
+document.getElementById("btn-copy").addEventListener("click", () => {
+  copyText(els.preview.textContent).then(ok => {
+    if (!ok) alert("复制失败，请手动从预览区选择复制");
+  });
+});
+
+els.fProfile.addEventListener("input", () => {
+  const p = current();
+  p.profile = els.fProfile.value.trim();
+  renderList();
+  refresh();
+  scheduleSave();
+});
+els.fLabel.addEventListener("input", () => {
+  const p = current();
+  p.label = els.fLabel.value;
+  renderList();
+  refresh();
+  scheduleSave();
+});
+
+loadState();
+renderForm();
+</script>
+</body>
+</html>
