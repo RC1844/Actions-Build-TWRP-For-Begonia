@@ -1,0 +1,66 @@
+[
+  {
+    "profile": "twrp-3.7.0-twrp11",
+    "label": "TWRP 3.7.0 / twrp-11",
+    "config": {
+      "recovery_name": "TWRP",
+      "recovery_version": "3.7.0",
+      "device": "begonia",
+      "manifest_url": "https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp",
+      "manifest_branch": "twrp-11",
+      "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
+      "device_tree_branch": "MIUI-android-11.0",
+      "device_tree_path": "device/redmi/begonia",
+      "lunch_prefix": "twrp",
+      "publish_release": false
+    }
+  },
+  {
+    "profile": "pbrp-3.1.0",
+    "label": "PBRP 3.1.0",
+    "config": {
+      "recovery_name": "PBRP",
+      "recovery_version": "3.1.0",
+      "device": "begonia",
+      "manifest_url": "https://github.com/PitchBlackRecoveryProject/manifest_pb",
+      "manifest_branch": "android-11.0",
+      "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
+      "device_tree_branch": "MIUI-android-11.0",
+      "device_tree_path": "device/redmi/begonia",
+      "lunch_prefix": "twrp",
+      "publish_release": false
+    }
+  },
+  {
+    "profile": "shrp-v3_11.0",
+    "label": "SHRP v3_11.0",
+    "config": {
+      "recovery_name": "SHRP",
+      "recovery_version": "v3_11.0",
+      "device": "begonia",
+      "manifest_url": "https://github.com/SHRP/manifest",
+      "manifest_branch": "v3_11.0",
+      "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
+      "device_tree_branch": "MIUI-android-11.0",
+      "device_tree_path": "device/redmi/begonia",
+      "lunch_prefix": "twrp",
+      "publish_release": false
+    }
+  },
+  {
+    "profile": "twrp-3.6.0-omni",
+    "label": "TWRP 3.6.0 / twrp-10.0 (omni)",
+    "config": {
+      "recovery_name": "TWRP",
+      "recovery_version": "3.6.0",
+      "device": "begonia",
+      "manifest_url": "https://github.com/RC1844/platform_manifest_twrp_omni",
+      "manifest_branch": "twrp-10.0",
+      "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
+      "device_tree_branch": "MIUI-android-11.0",
+      "device_tree_path": "device/redmi/begonia",
+      "lunch_prefix": "omni",
+      "publish_release": false
+    }
+  }
+]

@@ -1,68 +1,115 @@
 name: Build Recovery (begonia)
 
-# 调用方示例：只维护一张"构建目标表"，构建逻辑全部复用 build-recovery.yml。
-# workflow_dispatch 顶层 inputs 有 10 个上限，因此这里用 targets(JSON 数组)
-# 承载每个目标的全套参数；键名与 build-recovery.yml 头部 C 节 schema 一致，
-# 多出的键（如 publish_release）会被忽略，不会报错。
+# 手动构建入口：所有选项都是下拉框，实际参数值存放在 .github/recovery-profiles.json。
+#   · profile 选择预设，all 表示按 JSON 里的全部目标逐个构建；
+#   · 其余下拉默认「跟随预设」，即沿用 JSON 里的值，只有改成具体值时才覆盖；
+#   · JSON 里没有的键用 config_override 传一段内联 JSON，会合并进每个目标；
+#   · GitHub 对 workflow_dispatch 的 inputs 有 10 个上限，这里已用满。
+# 新增/修改预设：只改 .github/recovery-profiles.json，然后跑一次
+#   python .github/scripts/sync-form.py
+# 由脚本把 profile / device / recovery_name / manifest_branch / build_target /
+# lunch_variant 的 options 依据 JSON 重写（# <sync-form:*> 标记之间的内容勿手改）。
+# 忘了跑脚本时可用 python .github/scripts/sync-form.py --check 检查是否过期。
 
 on:
   workflow_dispatch:
     inputs:
-      targets:
-        description: "构建目标 JSON 数组（键名见 build-recovery.yml 头部 C 节）"
+      profile:
+        description: "预设目标；all = 全部目标"
+        required: true
+        type: choice
+        default: all
+        options:
+          # <sync-form:profile>
+          - all
+          - twrp-3.7.0-twrp11
+          - pbrp-3.1.0
+          - shrp-v3_11.0
+          - twrp-3.6.0-omni
+          # </sync-form:profile>
+      device:
+        description: "设备代号"
+        required: false
+        type: choice
+        default: 跟随预设
+        options:
+          # <sync-form:device>
+          - 跟随预设
+          - begonia
+          # </sync-form:device>
+      recovery_name:
+        description: "Recovery 名称"
+        required: false
+        type: choice
+        default: 跟随预设
+        options:
+          # <sync-form:recovery_name>
+          - 跟随预设
+          - TWRP
+          - PBRP
+          - SHRP
+          # </sync-form:recovery_name>
+      manifest_branch:
+        description: "源码分支"
+        required: false
+        type: choice
+        default: 跟随预设
+        options:
+          # <sync-form:manifest_branch>
+          - 跟随预设
+          - twrp-11
+          - android-11.0
+          - v3_11.0
+          - twrp-10.0
+          # </sync-form:manifest_branch>
+      build_target:
+        description: "mka 构建目标"
+        required: false
+        type: choice
+        default: 跟随预设
+        options:
+          # <sync-form:build_target>
+          - 跟随预设
+          - recoveryimage
+          - bootimage
+          - vendor_bootimage
+          # </sync-form:build_target>
+      lunch_variant:
+        description: "lunch 变体"
+        required: false
+        type: choice
+        default: 跟随预设
+        options:
+          # <sync-form:lunch_variant>
+          - 跟随预设
+          - eng
+          - userdebug
+          - user
+          # </sync-form:lunch_variant>
+      java_version:
+        description: "JDK 版本；跟随预设 = 用镜像自带 JDK"
+        required: false
+        type: choice
+        default: 跟随预设
+        options:
+          - 跟随预设
+          - "8"
+          - "11"
+          - "17"
+          - "21"
+      runner:
+        description: "运行环境；Android 10/11 老分支只能用 ubuntu-22.04"
+        required: true
+        type: choice
+        default: ubuntu-22.04
+        options:
+          - ubuntu-22.04
+          - ubuntu-24.04
+      config_override:
+        description: "高级：内联 JSON 覆盖，例如 {\"disable_crypto\": true}"
         required: false
         type: string
-        default: |
-          [
-            {
-              "recovery_name": "TWRP",
-              "recovery_version": "3.7.0",
-              "device": "begonia",
-              "manifest_url": "https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp",
-              "manifest_branch": "twrp-11",
-              "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
-              "device_tree_branch": "MIUI-android-11.0",
-              "device_tree_path": "device/redmi/begonia",
-              "lunch_prefix": "twrp",
-              "publish_release": false
-            },
-            {
-              "recovery_name": "PBRP",
-              "recovery_version": "3.1.0",
-              "device": "begonia",
-              "manifest_url": "https://github.com/PitchBlackRecoveryProject/manifest_pb",
-              "manifest_branch": "android-11.0",
-              "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
-              "device_tree_branch": "MIUI-android-11.0",
-              "device_tree_path": "device/redmi/begonia",
-              "lunch_prefix": "twrp",
-              "publish_release": false
-            },
-            {
-              "recovery_name": "SHRP",
-              "recovery_version": "v3_11.0",
-              "device": "begonia",
-              "manifest_url": "https://github.com/SHRP/manifest",
-              "manifest_branch": "v3_11.0",
-              "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
-              "device_tree_branch": "MIUI-android-11.0",
-              "device_tree_path": "device/redmi/begonia",
-              "lunch_prefix": "twrp",
-              "publish_release": false
-            },
-            {
-              "recovery_name": "TWRP",
-              "recovery_version": "3.6.0",
-              "device": "begonia",
-              "manifest_url": "https://github.com/RC1844/platform_manifest_twrp_omni",
-              "manifest_branch": "twrp-10.0",
-              "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
-              "device_tree_branch": "MIUI-android-11.0",
-              "device_tree_path": "device/redmi/begonia",
-              "lunch_prefix": "omni",
-              "publish_release": false
-            }
-          ]
+        default: ""
       validate_only:
         description: "仅校验配置，不执行构建"
         required: false
@@ -78,19 +125,90 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # 把下拉框的选择还原成每个目标各自的配置 JSON，再交给可复用流水线
+  prepare:
+    name: Resolve targets
+    runs-on: ubuntu-24.04
+    outputs:
+      targets: ${{ steps.resolve.outputs.targets }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Resolve targets from JSON
+        id: resolve
+        shell: bash
+        env:
+          IN_PROFILE: ${{ inputs.profile }}
+          IN_DEVICE: ${{ inputs.device }}
+          IN_RECOVERY_NAME: ${{ inputs.recovery_name }}
+          IN_MANIFEST_BRANCH: ${{ inputs.manifest_branch }}
+          IN_BUILD_TARGET: ${{ inputs.build_target }}
+          IN_LUNCH_VARIANT: ${{ inputs.lunch_variant }}
+          IN_JAVA_VERSION: ${{ inputs.java_version }}
+          IN_CONFIG_OVERRIDE: ${{ inputs.config_override }}
+        run: |
+          set -euo pipefail
+          profiles=".github/recovery-profiles.json"
+          jq -e 'type == "array" and length > 0' "$profiles" >/dev/null
+
+          if [ "$IN_PROFILE" = "all" ]; then
+            base="$(jq -c '[.[].config]' "$profiles")"
+          else
+            base="$(jq -c --arg p "$IN_PROFILE" '[.[] | select(.profile == $p) | .config]' "$profiles")"
+          fi
+
+          if [ "$(jq 'length' <<<"$base")" -eq 0 ]; then
+            echo "::error::profile '$IN_PROFILE' 在 $profiles 中不存在，可选值："
+            jq -r '.[].profile' "$profiles"
+            exit 1
+          fi
+
+          # 下拉覆盖项：仍为「跟随预设」或空时跳过，只保留真正改动过的
+          over="$(jq -n \
+            --arg device "$IN_DEVICE" \
+            --arg recovery_name "$IN_RECOVERY_NAME" \
+            --arg manifest_branch "$IN_MANIFEST_BRANCH" \
+            --arg build_target "$IN_BUILD_TARGET" \
+            --arg lunch_variant "$IN_LUNCH_VARIANT" \
+            --arg java_version "$IN_JAVA_VERSION" \
+            '{device: $device, recovery_name: $recovery_name, manifest_branch: $manifest_branch,
+              build_target: $build_target, lunch_variant: $lunch_variant, java_version: $java_version}
+             | with_entries(select(.value != "" and .value != "跟随预设"))')"
+
+          merged="$(jq -c --argjson over "$over" '[.[] | . * $over]' <<<"$base")"
+
+          # 高级覆盖：内联 JSON 再叠一层
+          if [ -n "$IN_CONFIG_OVERRIDE" ]; then
+            if ! jq -e 'type == "object"' <<<"$IN_CONFIG_OVERRIDE" >/dev/null 2>&1; then
+              echo "::error::config_override 不是合法的 JSON 对象"
+              exit 1
+            fi
+            merged="$(jq -c --argjson o "$IN_CONFIG_OVERRIDE" '[.[] | . * $o]' <<<"$merged")"
+          fi
+
+          {
+            echo "TARGETS<<__RECOVERY_TARGETS_EOF__"
+            printf '%s\n' "$merged"
+            echo "__RECOVERY_TARGETS_EOF__"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "共 $(jq 'length' <<<"$merged") 个构建目标："
+          jq -r '.[] | "  - \(.recovery_name) \(.recovery_version // "") / \(.device) @ \(.manifest_branch)"' <<<"$merged"
+
   build:
     name: ${{ matrix.recovery_name }} / ${{ matrix.device }}
+    needs: prepare
     strategy:
       fail-fast: false
       max-parallel: 2
       matrix:
-        include: ${{ fromJSON(inputs.targets || '[]') }}
+        include: ${{ fromJSON(needs.prepare.outputs.targets) }}
     uses: ./.github/workflows/build-recovery.yml
     permissions:
       contents: write
     with:
       config: ${{ toJSON(matrix) }}
       validate_only: ${{ inputs.validate_only }}
-      # 下面这些目标都是 Android 10/11 老分支，预编译工具依赖 openjdk-8 / libncurses5，
-      # 只能用 ubuntu-22.04；改用 24.04 需同时确认分支已升级工具链（可配合 java_version）。
-      runner: ubuntu-22.04
+      # 老分支依赖 openjdk-8 / libncurses5，默认走 22.04；切 24.04 需同时确认工具链
+      runner: ${{ inputs.runner }}
