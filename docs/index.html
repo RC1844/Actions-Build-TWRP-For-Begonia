@@ -166,8 +166,16 @@
   <section class="editor">
     <div class="basic templates">
       <div class="f">
+        <label for="tpl-android">Android 版本（筛选）</label>
+        <select id="tpl-android"></select>
+      </div>
+      <div class="f">
         <label for="tpl-recovery">Recovery 预设</label>
         <select id="tpl-recovery"></select>
+      </div>
+      <div class="f">
+        <label for="tpl-manifest">manifest 地址</label>
+        <select id="tpl-manifest"></select>
       </div>
       <div class="f">
         <label for="tpl-branch">manifest 分支</label>
@@ -225,12 +233,29 @@
 // t: string | int | bool | json
 // d: 内置默认值（留空/等于默认值时不写入 JSON）
 // ---------------------------------------------------------------------------
+// 完整 IANA 时区列表：现代浏览器直接用 Intl.supportedValuesOf，旧浏览器回退常用列表
+const TIMEZONES = (() => {
+  try {
+    if (typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function") {
+      const list = Intl.supportedValuesOf("timeZone");
+      if (Array.isArray(list) && list.length) return list;
+    }
+  } catch (e) { /* 不支持该 API，走回退列表 */ }
+  return [
+    "UTC", "Asia/Shanghai", "Asia/Hong_Kong", "Asia/Macau", "Asia/Taipei", "Asia/Tokyo",
+    "Asia/Seoul", "Asia/Singapore", "Asia/Bangkok", "Asia/Kolkata", "Asia/Dubai",
+    "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Moscow",
+    "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
+    "Australia/Sydney"
+  ];
+})();
+
 const SCHEMA = [
   { group: "基本信息", keys: [
     { k: "device", label: "设备代号", t: "string", d: "", req: true, hint: "产物命名与默认 lunch 目标" },
-    { k: "recovery_name", label: "Recovery 名称", t: "string", d: "Recovery", opts: ["TWRP", "PBRP", "SHRP", "OrangeFox"], hint: "产物与 Release 展示名" },
-    { k: "recovery_version", label: "版本号", t: "string", d: "", hint: "只写入说明与产物信息" },
-    { k: "timezone", label: "时区", t: "string", d: "Asia/Shanghai", opts: ["Asia/Shanghai", "UTC"], hint: "时间戳与日志时区" }
+    { k: "recovery_name", label: "Recovery 名称", t: "string", d: "Recovery", opts: ["TWRP", "PBRP", "SHRP", "OrangeFox", "AERA", "LineageOS"], hint: "产物与 Release 展示名" },
+    { k: "recovery_version", label: "版本号", t: "string", d: "", hint: "套用预设时按所选分支自动填入；手动填写的值不会被覆盖" },
+    { k: "timezone", label: "时区", t: "string", d: "Asia/Shanghai", opts: TIMEZONES, hint: "时间戳与日志时区，构建时会设置为 runner 系统时区" }
   ]},
   { group: "源码 manifest", keys: [
     { k: "manifest_url", label: "manifest 地址", t: "string", d: "", req: true, hint: "源码仓库地址" },
@@ -329,56 +354,118 @@ const BUILTIN = [
 
 // ---------------------------------------------------------------------------
 // 快速套用模板：manifest 地址与分支取自各项目官方仓库实际存在的分支
-// （TWRP / PBRP / SHRP 走 GitHub API，OrangeFox 走 GitLab API，核对于 2026-11）
+// （TWRP / PBRP / SHRP / AERA / LineageOS 走 GitHub API，OrangeFox 走 GitLab API，核对于 2026-11）
+// branches[].ver 为该分支源码里的 Recovery 版本号，套用预设时自动填入版本字段
 // ---------------------------------------------------------------------------
 const RECOVERY_TEMPLATES = [
   {
     name: "TWRP",
-    manifest_url: "https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp",
     lunch_prefix: "twrp",
     gerrit: "https://gerrit.twrp.me",
-    branches: [
-      { b: "twrp-14.1", v: "14.1" },
-      { b: "twrp-14", v: "14" },
-      { b: "twrp-12.1", v: "12.1" },
-      { b: "twrp-11", v: "11" }
+    manifests: [
+      {
+        url: "https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp",
+        label: "aosp（Android 11+）",
+        branches: [
+          { b: "twrp-14.1", v: "14.1", ver: "3.7.1_14" },
+          { b: "twrp-14", v: "14", ver: "3.7.0_12" },
+          { b: "twrp-12.1", v: "12.1", ver: "3.7.1_12" },
+          { b: "twrp-11", v: "11", ver: "3.7.0_11" }
+        ]
+      },
+      {
+        url: "https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni",
+        label: "omni（Android 10 及更早）",
+        branches: [
+          { b: "twrp-10.0-deprecated", v: "10", ver: "3.5.2_10" },
+          { b: "twrp-9.0", v: "9" },
+          { b: "twrp-8.1", v: "8.1" },
+          { b: "twrp-7.1", v: "7.1" },
+          { b: "twrp-6.0", v: "6.0" },
+          { b: "twrp-5.1", v: "5.1" }
+        ],
+        note: "Android 10 的 omni manifest 上游已标记 deprecated。"
+      },
+      {
+        url: "https://github.com/minimal-manifest-twrp/platform_manifest_twrp_lineageos",
+        label: "lineageos（Android 14.1）",
+        branches: [{ b: "twrp-14.1", v: "14.1", ver: "3.7.1_14" }]
+      }
     ]
   },
   {
     name: "PBRP",
-    manifest_url: "https://github.com/PitchBlackRecoveryProject/manifest_pb",
     lunch_prefix: "twrp",
-    branches: [
-      { b: "android-14.0", v: "14.0" },
-      { b: "android-12.1", v: "12.1" },
-      { b: "android-11.0", v: "11.0" },
-      { b: "android-10.0", v: "10.0" }
-    ],
-    note: "设备树需自带 vendor/pbrp 的配置，纯 TWRP 设备树可能因缺少 vendor/twrp 而 lunch 失败。"
+    manifests: [{
+      url: "https://github.com/PitchBlackRecoveryProject/manifest_pb",
+      label: "manifest_pb",
+      branches: [
+        { b: "android-14.0", v: "14" },
+        { b: "android-12.1", v: "12.1" },
+        { b: "android-11.0", v: "11" },
+        { b: "android-10.0", v: "10" }
+      ]
+    }],
+    note: "设备树需自带 vendor/pbrp 配置，纯 TWRP 设备树可能因缺少 vendor/twrp 而 lunch 失败。"
   },
   {
     name: "SHRP",
-    manifest_url: "https://github.com/SHRP/manifest",
     lunch_prefix: "twrp",
-    branches: [
-      { b: "shrp-12.1", v: "12.1" },
-      { b: "v3_11.0", v: "11.0" },
-      { b: "v3_10.0", v: "10.0" }
-    ]
+    manifests: [{
+      url: "https://github.com/SHRP/manifest",
+      label: "manifest",
+      branches: [
+        { b: "shrp-12.1", v: "12.1" },
+        { b: "v3_11.0", v: "11" },
+        { b: "v3_10.0", v: "10" }
+      ]
+    }]
   },
   {
     name: "OrangeFox",
-    manifest_url: "https://gitlab.com/OrangeFox/Manifest",
     lunch_prefix: "twrp",
-    branches: [{ b: "fox_16.0", v: "16" }],
-    note: "只提供完整的 fox_16.0 manifest；fox_12.1 / fox_14.1 需要先同步 TWRP 最小 manifest 再打补丁，本工作流不支持。"
+    manifests: [{
+      url: "https://gitlab.com/OrangeFox/Manifest",
+      label: "Manifest",
+      branches: [{ b: "fox_16.0", v: "16" }],
+      note: "上游只有 fox_16.0 是完整 manifest；fox_12.1 / fox_14.1 需先同步 TWRP 最小 manifest 再打补丁，本工作流不支持。"
+    }]
+  },
+  {
+    name: "AERA",
+    lunch_prefix: "twrp",
+    manifests: [{
+      url: "https://github.com/AERA-Recovery/android_manifest",
+      label: "android_manifest",
+      branches: [{ b: "aera-16.0", v: "16" }]
+    }],
+    note: "AERA 基于 Android 16 + TWRP 构建系统，lunch 目标为 twrp_<device>-eng。"
+  },
+  {
+    name: "LineageOS",
+    lunch_prefix: "lineage",
+    manifests: [{
+      url: "https://github.com/LineageOS/android",
+      label: "android（全量）",
+      branches: [
+        { b: "lineage-23.2", v: "16" },
+        { b: "lineage-23.1", v: "16" },
+        { b: "lineage-23.0", v: "16" },
+        { b: "lineage-22.2", v: "15" },
+        { b: "lineage-22.1", v: "15" },
+        { b: "lineage-22.0", v: "15" },
+        { b: "lineage-21.0", v: "14" },
+        { b: "lineage-20.0", v: "13" }
+      ]
+    }],
+    note: "LineageOS Recovery 需要设备树里启用 lineage_recovery，构建目标同为 recoveryimage。"
   }
 ];
 
 // 常用设备预设：设备树仓库与分支均已核对存在，device_tree_path 与 lunch 设备名一致
 const DEVICE_TEMPLATES = [
   {
-    device: "begonia", label: "Redmi Note 8 Pro (begonia) · A11", android: "11.0",
+    device: "begonia", label: "Redmi Note 8 Pro (begonia) · A11", android: "11",
     url: "https://github.com/RC1844/twrp_redmi_begonia",
     branch: "MIUI-android-11.0", path: "device/redmi/begonia"
   },
@@ -398,11 +485,21 @@ const DEVICE_TEMPLATES = [
     branch: "android-12.1", path: "device/xiaomi/vayu"
   },
   {
-    device: "mojito", label: "Redmi Note 10 (mojito) · A11", android: "11.0",
+    device: "mojito", label: "Redmi Note 10 (mojito) · A11", android: "11",
     url: "https://github.com/nebrassy/device_xiaomi_mojito-TWRP",
     branch: "android-11", path: "device/xiaomi/mojito"
   }
 ];
+
+// 预设联动用的派生数据：Android 版本筛选候选、各分支已知的 Recovery 版本号
+const ANDROID_VERSIONS = (() => {
+  const set = new Set();
+  for (const t of RECOVERY_TEMPLATES) for (const m of t.manifests) for (const b of m.branches) set.add(String(b.v || "").split(".")[0]);
+  for (const d of DEVICE_TEMPLATES) set.add(String(d.android || "").split(".")[0]);
+  return Array.from(set).filter(Boolean).sort((a, b) => Number(b) - Number(a));
+})();
+const KNOWN_VERSIONS = new Set();
+for (const t of RECOVERY_TEMPLATES) for (const m of t.manifests) for (const b of m.branches) if (b.ver) KNOWN_VERSIONS.add(b.ver);
 
 const state = { profiles: [], current: 0 };
 let envInvalid = false;
@@ -416,7 +513,9 @@ const els = {
   saveState: document.getElementById("save-state"),
   fProfile: document.getElementById("f-profile"),
   fLabel: document.getElementById("f-label"),
+  tplAndroid: document.getElementById("tpl-android"),
   tplRecovery: document.getElementById("tpl-recovery"),
+  tplManifest: document.getElementById("tpl-manifest"),
   tplBranch: document.getElementById("tpl-branch"),
   tplDevice: document.getElementById("tpl-device"),
   tplTip: document.getElementById("tpl-tip")
@@ -701,94 +800,202 @@ function assignConfig(p, key, value) {
   else p.config[key] = s;
 }
 
-function matchBranch(tpl, android) {
-  if (!tpl || !android) return null;
-  const major = String(android).split(".")[0];
-  return tpl.branches.find(b => b.v === android || b.v === major) || null;
+// ---------------------------------------------------------------------------
+// 预设联动
+// Android 版本只是 UI 筛选条件（"14" 与 "14.1" 视为同一代），不写入 config；
+// 配置里的 Android 版本始终由 manifest_branch 表达。
+// ---------------------------------------------------------------------------
+let tplAndroid = "";
+// 当前配置的 manifest 地址不在任何预设里（第三方 fork）时记录在此，作为一个额外选项
+let tplCustom = null;
+const tplUI = { rec: 0, man: 0, branch: "", dev: "" };
+
+function androidOf(v) { return String(v || "").split(".")[0]; }
+
+function vMatch(a, b) {
+  if (!a || !b) return true;
+  return String(a) === String(b) || androidOf(a) === androidOf(b);
 }
 
-function pickBranch(tpl, dev, prefer) {
-  if (!tpl || !tpl.branches.length) return "";
-  if (prefer && tpl.branches.some(b => b.b === prefer)) return prefer;
-  const matched = dev ? matchBranch(tpl, dev.android) : null;
-  return matched ? matched.b : tpl.branches[0].b;
+function branchesOf(tpl, man) {
+  const list = man ? man.branches : [].concat(...tpl.manifests.map(m => m.branches));
+  return tplAndroid ? list.filter(b => vMatch(b.v, tplAndroid)) : list;
 }
 
-function renderBranches(prefer, keepUnknown) {
-  const tpl = RECOVERY_TEMPLATES[Number(els.tplRecovery.value)];
-  const list = tpl ? tpl.branches : [];
+function currentTpl() { return RECOVERY_TEMPLATES[tplUI.rec] || null; }
+function isCustom() { return tplUI.man === -1; }
+function currentMan() {
+  if (isCustom()) return null;
+  const tpl = currentTpl();
+  return tpl ? tpl.manifests[tplUI.man] : null;
+}
+function currentDev() { return tplUI.dev === "" ? null : (DEVICE_TEMPLATES[Number(tplUI.dev)] || null); }
+
+function matchBranch(tpl, man, dev) {
+  if (!tpl || !dev) return null;
+  return branchesOf(tpl, man).find(b => vMatch(b.v, dev.android)) || null;
+}
+
+function pickBranch(tpl, man, dev, prefer) {
+  const list = branchesOf(tpl, man);
+  if (!list.length) return "";
+  if (prefer && list.some(b => b.b === prefer)) return prefer;
+  const matched = matchBranch(tpl, man, dev);
+  return matched ? matched.b : list[0].b;
+}
+
+function addOption(sel, value, text) {
+  const op = document.createElement("option");
+  op.value = value;
+  op.textContent = text;
+  sel.appendChild(op);
+}
+
+function deviceIndexFor(cfg) {
+  const i = DEVICE_TEMPLATES.findIndex(d => d.device === cfg.device && d.url === cfg.device_tree_url);
+  return i < 0 ? "" : String(i);
+}
+
+// 按当前 Android 筛选重建四个下拉：不可用的选项不出现，选择尽量保留
+function renderTplSelects() {
+  if (!ANDROID_VERSIONS.includes(tplAndroid)) tplAndroid = "";
+  els.tplAndroid.innerHTML = "";
+  addOption(els.tplAndroid, "", "全部（不筛选）");
+  for (const v of ANDROID_VERSIONS) addOption(els.tplAndroid, v, "Android " + v);
+  els.tplAndroid.value = tplAndroid;
+
+  let recIdx = RECOVERY_TEMPLATES.map((t, i) => i).filter(i => branchesOf(RECOVERY_TEMPLATES[i]).length);
+  if (!recIdx.length) recIdx = RECOVERY_TEMPLATES.map((t, i) => i);
+  if (!recIdx.includes(tplUI.rec)) tplUI.rec = recIdx[0];
+  els.tplRecovery.innerHTML = "";
+  for (const i of recIdx) addOption(els.tplRecovery, String(i), RECOVERY_TEMPLATES[i].name);
+  els.tplRecovery.value = String(tplUI.rec);
+
+  // manifest：同一 Recovery 的多套官方 manifest 都可选（如 TWRP 的 aosp / omni / lineageos）
+  const tpl = currentTpl();
+  let manIdx = tpl.manifests.map((m, i) => i).filter(i => branchesOf(tpl, tpl.manifests[i]).length);
+  if (!manIdx.length) manIdx = tpl.manifests.map((m, i) => i);
+  if (tplCustom) manIdx.push(-1);
+  if (!manIdx.includes(tplUI.man)) tplUI.man = manIdx[0];
+  els.tplManifest.innerHTML = "";
+  for (const i of manIdx) {
+    if (i === -1) addOption(els.tplManifest, "-1", tplCustom.url + "（当前配置，未收录）");
+    else {
+      const m = tpl.manifests[i];
+      addOption(els.tplManifest, String(i), m.label ? m.label : m.url);
+    }
+  }
+  els.tplManifest.value = String(tplUI.man);
+
+  // 分支：当前配置的分支若不在该 manifest 里（常见于第三方 fork），只在列表末尾标注出来，不默认选中
+  const list = isCustom()
+    ? (tplCustom.branch ? [{ b: tplCustom.branch, v: "", ver: "" }] : [])
+    : branchesOf(tpl, currentMan());
+  const outside = !isCustom() && tplUI.branch && !list.some(b => b.b === tplUI.branch) ? tplUI.branch : "";
   els.tplBranch.innerHTML = "";
-  // 当前配置的分支不在模板里时（如 twrp-10.0），保留一条原样显示，避免看起来被改掉
-  if (keepUnknown && prefer && !list.some(b => b.b === prefer)) {
-    const op = document.createElement("option");
-    op.value = prefer;
-    op.textContent = prefer + "  （当前配置）";
-    els.tplBranch.appendChild(op);
-  }
   for (const b of list) {
-    const op = document.createElement("option");
-    op.value = b.b;
-    op.textContent = b.b + "  (android " + b.v + ")";
-    els.tplBranch.appendChild(op);
+    addOption(els.tplBranch, b.b, isCustom()
+      ? b.b + "  （当前配置，不在预设列表中）"
+      : b.b + "  (Android " + b.v + ")" + (b.ver ? " · " + b.ver : ""));
   }
-  if (prefer) els.tplBranch.value = prefer;
+  if (outside) addOption(els.tplBranch, outside, outside + "  （当前配置，不在该 manifest 中）");
+  tplUI.branch = isCustom()
+    ? (list.length ? list[0].b : "")
+    : pickBranch(tpl, currentMan(), currentDev(), outside ? "" : tplUI.branch);
+  els.tplBranch.value = tplUI.branch;
+
+  let devIdx = DEVICE_TEMPLATES.map((d, i) => i).filter(i => !tplAndroid || vMatch(DEVICE_TEMPLATES[i].android, tplAndroid));
+  if (tplUI.dev !== "" && !devIdx.includes(Number(tplUI.dev))) tplUI.dev = "";
+  els.tplDevice.innerHTML = "";
+  addOption(els.tplDevice, "", "（不套用设备）");
+  for (const i of devIdx) addOption(els.tplDevice, String(i), DEVICE_TEMPLATES[i].label);
+  els.tplDevice.value = tplUI.dev;
 }
 
 function updateTplTip() {
-  const tpl = RECOVERY_TEMPLATES[Number(els.tplRecovery.value)];
-  const dev = els.tplDevice.value === "" ? null : DEVICE_TEMPLATES[Number(els.tplDevice.value)];
+  const tpl = currentTpl();
+  const man = currentMan();
+  const dev = currentDev();
   const parts = [];
-  if (tpl) {
-    parts.push(tpl.manifest_url);
-    if (tpl.note) parts.push(tpl.note);
+  if (isCustom()) {
+    parts.push(tplCustom.url + " @" + (tplUI.branch || "?"));
+    parts.push("该 manifest 不在预设列表中，套用预设时保留原有源码地址与分支");
+  } else if (man) {
+    parts.push(man.url + " @" + (tplUI.branch || "?"));
+    const entry = man.branches.find(b => b.b === tplUI.branch);
+    parts.push(entry && entry.ver ? "版本自动填 " + entry.ver : "该分支无已知版本号，版本号请手填");
+    if (man.note) parts.push(man.note);
   }
+  if (tpl && tpl.note) parts.push(tpl.note);
   if (dev) parts.push("设备树：" + dev.url + " @" + dev.branch);
   els.tplTip.textContent = parts.join(" · ");
 }
 
+// 由当前配置反查预设：先按 manifest 地址，再按 Recovery 名称（都找不到时保留当前 manifest 作为额外选项）
 function syncTemplateUI() {
   const cfg = current().config;
-  let idx = RECOVERY_TEMPLATES.findIndex(t => t.manifest_url === cfg.manifest_url);
-  if (idx < 0) idx = RECOVERY_TEMPLATES.findIndex(t => t.name === cfg.recovery_name);
-  els.tplRecovery.value = String(idx < 0 ? 0 : idx);
-  renderBranches(cfg.manifest_branch || "", true);
-  const dIdx = DEVICE_TEMPLATES.findIndex(d => d.device === cfg.device && d.url === cfg.device_tree_url);
-  els.tplDevice.value = dIdx < 0 ? "" : String(dIdx);
+  let rec = -1, man = 0;
+  for (let i = 0; i < RECOVERY_TEMPLATES.length && rec < 0; i++) {
+    const j = RECOVERY_TEMPLATES[i].manifests.findIndex(m => m.url === cfg.manifest_url);
+    if (j >= 0) { rec = i; man = j; }
+  }
+  tplCustom = null;
+  if (rec < 0) {
+    rec = RECOVERY_TEMPLATES.findIndex(t => t.name === cfg.recovery_name);
+    if (rec < 0) rec = 0;
+    man = 0;
+    if (cfg.manifest_url) tplCustom = { url: cfg.manifest_url, branch: cfg.manifest_branch || "" };
+  }
+  const branch = cfg.manifest_branch || "";
+  const entry = tplCustom ? null : RECOVERY_TEMPLATES[rec].manifests[man].branches.find(b => b.b === branch);
+  // 分支不属于任何模板（多见于第三方 fork）时清空筛选，避免把上一个预设的筛选带过来
+  tplAndroid = entry ? androidOf(entry.v) : "";
+  tplUI.rec = rec;
+  tplUI.man = tplCustom ? -1 : man;
+  tplUI.branch = branch;
+  tplUI.dev = deviceIndexFor(cfg);
+  renderTplSelects();
   updateTplTip();
 }
 
 function initTemplateSelects() {
-  RECOVERY_TEMPLATES.forEach((t, i) => {
-    const op = document.createElement("option");
-    op.value = String(i);
-    op.textContent = t.name;
-    els.tplRecovery.appendChild(op);
-  });
-  const none = document.createElement("option");
-  none.value = "";
-  none.textContent = "（不套用设备）";
-  els.tplDevice.appendChild(none);
-  DEVICE_TEMPLATES.forEach((d, i) => {
-    const op = document.createElement("option");
-    op.value = String(i);
-    op.textContent = d.label;
-    els.tplDevice.appendChild(op);
-  });
-
-  // 换 Recovery：沿用当前分支（若新模板也有），否则按设备版本或首个分支
-  els.tplRecovery.addEventListener("change", () => {
-    const tpl = RECOVERY_TEMPLATES[Number(els.tplRecovery.value)];
-    const dev = els.tplDevice.value === "" ? null : DEVICE_TEMPLATES[Number(els.tplDevice.value)];
-    renderBranches(pickBranch(tpl, dev, current().config.manifest_branch || ""), false);
+  els.tplAndroid.addEventListener("change", () => {
+    tplAndroid = els.tplAndroid.value;
+    renderTplSelects();
     updateTplTip();
   });
 
-  // 换设备：切到与设备 Android 版本匹配的分支，无匹配则保留当前分支
+  // 换 Recovery：manifest 回到首个可用项，分支按设备版本或首个
+  els.tplRecovery.addEventListener("change", () => {
+    tplUI.rec = Number(els.tplRecovery.value);
+    tplUI.man = 0;
+    tplUI.branch = "";
+    tplCustom = null;
+    renderTplSelects();
+    updateTplTip();
+  });
+
+  els.tplManifest.addEventListener("change", () => {
+    tplUI.man = Number(els.tplManifest.value);
+    tplUI.branch = "";
+    renderTplSelects();
+    updateTplTip();
+  });
+
+  els.tplBranch.addEventListener("change", () => {
+    tplUI.branch = els.tplBranch.value;
+    updateTplTip();
+  });
+
+  // 换设备：优先切到与设备 Android 版本一致的分支，没有匹配就保持原分支
   els.tplDevice.addEventListener("change", () => {
-    const tpl = RECOVERY_TEMPLATES[Number(els.tplRecovery.value)];
-    const dev = els.tplDevice.value === "" ? null : DEVICE_TEMPLATES[Number(els.tplDevice.value)];
-    const matched = dev ? matchBranch(tpl, dev.android) : null;
-    renderBranches(matched ? matched.b : els.tplBranch.value, false);
+    tplUI.dev = els.tplDevice.value;
+    const dev = currentDev();
+    if (dev && !isCustom()) {
+      const matched = matchBranch(currentTpl(), currentMan(), dev);
+      if (matched) tplUI.branch = matched.b;
+    }
+    renderTplSelects();
     updateTplTip();
   });
 
@@ -797,15 +1004,26 @@ function initTemplateSelects() {
 
 function applyPreset() {
   const p = current();
-  const tpl = RECOVERY_TEMPLATES[Number(els.tplRecovery.value)];
-  if (!tpl) return;
-  const dev = els.tplDevice.value === "" ? null : DEVICE_TEMPLATES[Number(els.tplDevice.value)];
+  const tpl = currentTpl();
+  const custom = isCustom();
+  const man = currentMan();
+  if (!tpl || !tplUI.branch) return;
+  const dev = currentDev();
 
   assignConfig(p, "recovery_name", tpl.name);
-  assignConfig(p, "manifest_url", tpl.manifest_url);
-  assignConfig(p, "manifest_branch", els.tplBranch.value);
-  if (tpl.lunch_prefix) assignConfig(p, "lunch_prefix", tpl.lunch_prefix);
-  if (tpl.gerrit) assignConfig(p, "repopick_gerrit", tpl.gerrit);
+  if (!custom) {
+    assignConfig(p, "manifest_url", man.url);
+    assignConfig(p, "manifest_branch", tplUI.branch);
+    if (tpl.lunch_prefix) assignConfig(p, "lunch_prefix", tpl.lunch_prefix);
+    if (tpl.gerrit) assignConfig(p, "repopick_gerrit", tpl.gerrit);
+
+    // 版本号自动填：分支带已知版本时写入；已手填其它值则保留
+    const entry = man.branches.find(b => b.b === tplUI.branch);
+    if (entry && entry.ver) {
+      const cur = String(p.config.recovery_version || "");
+      if (!cur || KNOWN_VERSIONS.has(cur)) assignConfig(p, "recovery_version", entry.ver);
+    }
+  }
 
   if (dev) {
     assignConfig(p, "device", dev.device);
