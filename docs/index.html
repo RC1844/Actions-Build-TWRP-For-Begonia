@@ -253,13 +253,16 @@ const TIMEZONES = (() => {
 const SCHEMA = [
   { group: "基本信息", keys: [
     { k: "device", label: "设备代号", t: "string", d: "", req: true, hint: "产物命名与默认 lunch 目标" },
-    { k: "recovery_name", label: "Recovery 名称", t: "string", d: "Recovery", opts: ["TWRP", "PBRP", "SHRP", "OrangeFox", "AERA", "LineageOS"], hint: "产物与 Release 展示名" },
+    { k: "recovery_name", label: "Recovery 名称", t: "string", d: "Recovery", opts: ["TWRP", "PBRP", "SHRP", "OrangeFox", "AERA", "ASRP", "LineageOS"], hint: "产物与 Release 展示名" },
     { k: "recovery_version", label: "版本号", t: "string", d: "", hint: "套用预设时按所选分支自动填入；手动填写的值不会被覆盖" },
     { k: "timezone", label: "时区", t: "string", d: "Asia/Shanghai", opts: TIMEZONES, hint: "时间戳与日志时区，构建时会设置为 runner 系统时区" }
   ]},
   { group: "源码 manifest", keys: [
     { k: "manifest_url", label: "manifest 地址", t: "string", d: "", req: true, hint: "源码仓库地址" },
     { k: "manifest_branch", label: "manifest 分支", t: "string", d: "", req: true, hint: "如 twrp-11 / android-11.0" },
+    { k: "source_sync", label: "源码同步方式", t: "string", d: "repo", opts: ["repo", "orangefox"], hint: "orangefox = 调用官方 orangefox_sync.sh 组装源码；该方式下克隆深度与 groups 不生效" },
+    { k: "orangefox_branch", label: "OrangeFox 分支", t: "string", d: "", hint: "不含 fox_ 前缀，如 12.1；留空则取 manifest 分支去掉 fox_" },
+    { k: "orangefox_sync_url", label: "orangefox sync 仓库", t: "string", d: "https://gitlab.com/OrangeFox/sync.git", wide: true },
     { k: "manifest_depth", label: "克隆深度", t: "int", d: 1, min: 0, hint: "repo init --depth；0 = 完整历史" },
     { k: "manifest_groups", label: "repo groups", t: "string", d: "all,-notdefault,-device,-darwin,-x86,-mips", wide: true, hint: "空字符串在配置里表示不传该参数" },
     { k: "workspace_dir", label: "工作目录", t: "string", d: "workspace", hint: "相对仓库根目录" }
@@ -427,8 +430,13 @@ const RECOVERY_TEMPLATES = [
     manifests: [{
       url: "https://gitlab.com/OrangeFox/Manifest",
       label: "Manifest",
-      branches: [{ b: "fox_16.0", v: "16" }],
-      note: "上游只有 fox_16.0 是完整 manifest；fox_12.1 / fox_14.1 需先同步 TWRP 最小 manifest 再打补丁，本工作流不支持。"
+      branches: [
+        { b: "fox_16.0", v: "16" },
+        { b: "fox_14.1", v: "14.1", sync: "orangefox" },
+        { b: "fox_12.1", v: "12.1", sync: "orangefox" },
+        { b: "fox_11.0", v: "11", sync: "orangefox" }
+      ],
+      note: "fox_16.0 是完整 manifest；fox_11.0 / 12.1 / 14.1 上游没有完整 manifest，通过 source_sync=orangefox 调用官方 orangefox_sync.sh 组装源码。fox_11.0 在 R11.2 起已停止支持。"
     }]
   },
   {
@@ -440,6 +448,16 @@ const RECOVERY_TEMPLATES = [
       branches: [{ b: "aera-16.0", v: "16" }]
     }],
     note: "AERA 基于 Android 16 + TWRP 构建系统，lunch 目标为 twrp_<device>-eng。"
+  },
+  {
+    name: "ASRP",
+    lunch_prefix: "twrp",
+    manifests: [{
+      url: "https://github.com/AERA-Recovery/android_manifest",
+      label: "AERA android_manifest（ASRP 复用）",
+      branches: [{ b: "aera-16.0", v: "16" }]
+    }],
+    note: "ASRP（Another Super Recovery Project）是 AERA 的 fork，支持 Android 14–17；上游无独立 manifest，沿用 AERA 的 aera-16.0，lunch 目标为 twrp_<device>-eng。"
   },
   {
     name: "LineageOS",
@@ -606,10 +624,13 @@ function exported() {
 
 function validateProfile(p, checkEnv) {
   const errs = [];
+  // orangefox 方式下源码由官方脚本组装，manifest 地址与分支允许留空
+  const foxSync = p.config.source_sync === "orangefox";
   for (const key of KEYS) {
     const f = FIELDS[key];
     const v = p.config[key];
     if (f.req && (v === undefined || String(v).trim() === "")) {
+      if (foxSync && (key === "manifest_url" || key === "manifest_branch")) continue;
       errs.push({ key, msg: f.label + "（" + key + "）必填" });
       continue;
     }
@@ -618,6 +639,11 @@ function validateProfile(p, checkEnv) {
       else if (f.min !== undefined && v < f.min) errs.push({ key, msg: key + " 不能小于 " + f.min });
       else if (f.max !== undefined && v > f.max) errs.push({ key, msg: key + " 不能大于 " + f.max });
     }
+  }
+  if (foxSync
+    && !String(p.config.orangefox_branch || "").trim()
+    && !String(p.config.manifest_branch || "").trim()) {
+    errs.push({ key: "orangefox_branch", msg: "源码同步方式为 orangefox 时需填写 OrangeFox 分支（或 manifest 分支，形如 fox_13.0）" });
   }
   if (!p.profile.trim()) errs.push({ key: null, msg: "预设 ID 不能为空" });
   else if (!/^[A-Za-z0-9._-]+$/.test(p.profile)) errs.push({ key: null, msg: "预设 ID 只能包含字母、数字、点、下划线和连字符" });
@@ -911,7 +937,7 @@ function renderTplSelects() {
   for (const b of list) {
     addOption(els.tplBranch, b.b, isCustom()
       ? b.b + "  （当前配置，不在预设列表中）"
-      : b.b + "  (Android " + b.v + ")" + (b.ver ? " · " + b.ver : ""));
+      : b.b + "  (Android " + b.v + ")" + (b.ver ? " · " + b.ver : "") + (b.sync === "orangefox" ? " · orangefox_sync" : ""));
   }
   if (outside) addOption(els.tplBranch, outside, outside + "  （当前配置，不在该 manifest 中）");
   tplUI.branch = isCustom()
@@ -939,6 +965,9 @@ function updateTplTip() {
     parts.push(man.url + " @" + (tplUI.branch || "?"));
     const entry = man.branches.find(b => b.b === tplUI.branch);
     parts.push(entry && entry.ver ? "版本自动填 " + entry.ver : "该分支无已知版本号，版本号请手填");
+    if (entry && entry.sync === "orangefox") {
+      parts.push("源码由 orangefox_sync.sh 组装（--branch " + entry.b.replace(/^fox_/, "") + "）");
+    }
     if (man.note) parts.push(man.note);
   }
   if (tpl && tpl.note) parts.push(tpl.note);
@@ -950,6 +979,12 @@ function updateTplTip() {
 function syncTemplateUI() {
   const cfg = current().config;
   let rec = -1, man = 0;
+  // 先按「名称 + manifest 地址」定位（ASRP 与 AERA 共用同一 manifest），再退回纯地址匹配
+  const byName = RECOVERY_TEMPLATES.findIndex(t => t.name === cfg.recovery_name);
+  if (byName >= 0) {
+    const j = RECOVERY_TEMPLATES[byName].manifests.findIndex(m => m.url === cfg.manifest_url);
+    if (j >= 0) { rec = byName; man = j; }
+  }
   for (let i = 0; i < RECOVERY_TEMPLATES.length && rec < 0; i++) {
     const j = RECOVERY_TEMPLATES[i].manifests.findIndex(m => m.url === cfg.manifest_url);
     if (j >= 0) { rec = i; man = j; }
@@ -1032,8 +1067,13 @@ function applyPreset() {
     if (tpl.lunch_prefix) assignConfig(p, "lunch_prefix", tpl.lunch_prefix);
     if (tpl.gerrit) assignConfig(p, "repopick_gerrit", tpl.gerrit);
 
-    // 版本号自动填：分支带已知版本时写入；已手填其它值则保留
     const entry = man.branches.find(b => b.b === tplUI.branch);
+    // 源码准备方式：fox_11.0 / 12.1 / 14.1 走官方 sync 脚本，其余走普通 repo
+    const sync = (entry && entry.sync) || "repo";
+    assignConfig(p, "source_sync", sync);
+    assignConfig(p, "orangefox_branch", sync === "orangefox" ? tplUI.branch.replace(/^fox_/, "") : "");
+
+    // 版本号自动填：分支带已知版本时写入；已手填其它值则保留
     if (entry && entry.ver) {
       const cur = String(p.config.recovery_version || "");
       if (!cur || KNOWN_VERSIONS.has(cur)) assignConfig(p, "recovery_version", entry.ver);

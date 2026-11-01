@@ -61,9 +61,12 @@ name: Reusable Recovery Build
 # | device                    | string | ""                                              | 设备代号，用于产物命名与默认 lunch 目标。【必填】 |
 # | recovery_name             | string | "Recovery"                                      | 产物与 Release 展示名，如 TWRP / PBRP / SHRP |
 # | recovery_version          | string | ""                                              | 版本号，仅写入说明与产物信息 |
-# | manifest_url              | string | ""                                              | 源码 manifest 仓库地址。【必填】 |
-# | manifest_branch           | string | ""                                              | 源码 manifest 分支。【必填】 |
-# | manifest_depth            | int    | 1                                               | repo init --depth；0 = 完整历史（范围 ≥ 0） |
+# | manifest_url              | string | ""                                              | 源码 manifest 仓库地址。【source_sync=repo 时必填】 |
+# | manifest_branch           | string | ""                                              | 源码 manifest 分支。【source_sync=repo 时必填】 |
+# | source_sync               | string | "repo"                                          | 源码准备方式：repo（普通 repo init/sync）/ orangefox（调用官方 orangefox_sync.sh 组装 legacy fox 分支） |
+# | orangefox_branch          | string | ""                                              | source_sync=orangefox 时使用，不含 fox_ 前缀，如 12.1；留空则取 manifest_branch 去掉 fox_ |
+# | orangefox_sync_url        | string | "https://gitlab.com/OrangeFox/sync.git"         | orangefox 同步脚本所在仓库 |
+# | manifest_depth            | int    | 1                                               | repo init --depth；0 = 完整历史（范围 ≥ 0）；source_sync=orangefox 时不生效 |
 # | manifest_groups           | string | "all,-notdefault,-device,-darwin,-x86,-mips"     | repo init --groups；空字符串表示不传该参数 |
 # | workspace_dir             | string | "workspace"                                     | 源码工作目录（相对仓库根目录） |
 # | device_tree_url           | string | ""                                              | 设备树仓库地址。【必填】 |
@@ -197,6 +200,9 @@ jobs:
           "device": "",
           "manifest_url": "",
           "manifest_branch": "",
+          "source_sync": "repo",
+          "orangefox_branch": "",
+          "orangefox_sync_url": "https://gitlab.com/OrangeFox/sync.git",
           "manifest_depth": 1,
           "manifest_groups": "all,-notdefault,-device,-darwin,-x86,-mips",
           "workspace_dir": "workspace",
@@ -336,9 +342,29 @@ jobs:
           set -euo pipefail
           fail=0
 
-          # 必填项：通用流水线无法猜测"要构建什么"，这 5 项必须由调用方给出
+          # 必填项：通用流水线无法猜测"要构建什么"，这几项必须由调用方给出
+          case "${SOURCE_SYNC:-repo}" in
+            repo|orangefox) ;;
+            *) echo "::error::source_sync 只能是 repo 或 orangefox，当前值：${SOURCE_SYNC:-（空）}"; fail=1 ;;
+          esac
+
+          required="DEVICE DEVICE_TREE_URL DEVICE_TREE_PATH"
+          if [ "${SOURCE_SYNC:-repo}" = "orangefox" ]; then
+            # orangefox 方式由 sync 脚本自行 repo init，manifest 地址/分支可省，但至少要有一个分支来源
+            if [ -z "${ORANGEFOX_BRANCH:-}" ] && [ -z "${MANIFEST_BRANCH:-}" ]; then
+              echo "::error::source_sync=orangefox 时需要 orangefox_branch（或 manifest_branch，形如 fox_13.0）"
+              fail=1
+            fi
+            if [ -n "${ORANGEFOX_BRANCH:-}" ] && ! printf '%s' "$ORANGEFOX_BRANCH" | grep -Eq '^[0-9]+(\.[0-9]+)*$'; then
+              echo "::error::orangefox_branch 只能是不含 fox_ 前缀的版本号，如 12.1，当前值：$ORANGEFOX_BRANCH"
+              fail=1
+            fi
+          else
+            required="$required MANIFEST_URL MANIFEST_BRANCH"
+          fi
+
           missing=""
-          for v in DEVICE MANIFEST_URL MANIFEST_BRANCH DEVICE_TREE_URL DEVICE_TREE_PATH; do
+          for v in $required; do
             [ -n "${!v:-}" ] || missing="$missing $v"
           done
           if [ -n "$missing" ]; then
@@ -525,6 +551,29 @@ jobs:
           set -euo pipefail
           mkdir -p "$WORKSPACE_DIR"
           cd "$WORKSPACE_DIR"
+          ws="$(pwd)"
+
+          # OrangeFox legacy 分支（11.0 / 12.1 / 14.1）上游没有完整 manifest：
+          # 官方 sync 脚本会先 repo init TWRP 最小 manifest，再注入补丁与 local manifest，
+          # 因此这三条分支走脚本，manifest_depth / manifest_groups 不生效。
+          if [ "${SOURCE_SYNC:-repo}" = "orangefox" ]; then
+            fox="${ORANGEFOX_BRANCH:-}"
+            [ -n "$fox" ] || fox="${MANIFEST_BRANCH#fox_}"
+            sync_url="${ORANGEFOX_SYNC_URL:-https://gitlab.com/OrangeFox/sync.git}"
+            if [ "${MANIFEST_DEPTH:-1}" != "1" ] || [ "${MANIFEST_GROUPS:-all,-notdefault,-device,-darwin,-x86,-mips}" != "all,-notdefault,-device,-darwin,-x86,-mips" ]; then
+              echo "::warning::source_sync=orangefox 时 manifest_depth / manifest_groups 不生效"
+            fi
+            tmp="$(mktemp -d)"
+            echo "::group::orangefox_sync.sh --branch $fox"
+            git clone --depth=1 --single-branch "$sync_url" "$tmp/sync"
+            chmod +x "$tmp/sync/orangefox_sync.sh"
+            ( cd "$tmp/sync" && ./orangefox_sync.sh --branch "$fox" --path "$ws" --ssh 0 )
+            echo "::endgroup::"
+            # 后续步骤（缓存键、构建摘要、Release 说明）统一使用 fox 分支名
+            [ -n "${MANIFEST_URL:-}" ] || echo "MANIFEST_URL=https://gitlab.com/OrangeFox/Manifest" >> "$GITHUB_ENV"
+            [ -n "${MANIFEST_BRANCH:-}" ] || echo "MANIFEST_BRANCH=fox_${fox}" >> "$GITHUB_ENV"
+            exit 0
+          fi
 
           init_args=()
           if [ "${MANIFEST_DEPTH:-0}" -gt 0 ]; then
