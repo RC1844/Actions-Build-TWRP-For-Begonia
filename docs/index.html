@@ -71,11 +71,13 @@
   }
   .basic .f{display:flex; flex-direction:column; gap:4px; min-width:200px; flex:1}
   .basic label{font-size:12px; color:var(--text-muted)}
-  .basic input{
+  .basic input,.basic select{
     font:inherit; font-size:13px; padding:6px 8px; border-radius:8px;
     border:1px solid var(--border); background:var(--bg); color:var(--text);
   }
   .basic .btns{display:flex; gap:8px}
+  .templates{margin-bottom:14px}
+  .templates .tip{flex-basis:100%; margin:0; font-size:12px; color:var(--text-muted); word-break:break-all}
   .group{
     background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
     padding:14px 16px 6px; margin-top:14px;
@@ -162,6 +164,25 @@
   </aside>
 
   <section class="editor">
+    <div class="basic templates">
+      <div class="f">
+        <label for="tpl-recovery">Recovery 预设</label>
+        <select id="tpl-recovery"></select>
+      </div>
+      <div class="f">
+        <label for="tpl-branch">manifest 分支</label>
+        <select id="tpl-branch"></select>
+      </div>
+      <div class="f">
+        <label for="tpl-device">设备预设</label>
+        <select id="tpl-device"></select>
+      </div>
+      <div class="btns">
+        <button id="btn-apply-preset" class="primary">套用预设</button>
+      </div>
+      <p class="tip" id="tpl-tip"></p>
+    </div>
+
     <div class="basic">
       <div class="f">
         <label for="f-profile">预设 ID（profile，用于下拉选择）</label>
@@ -306,10 +327,86 @@ const BUILTIN = [
       lunch_prefix: "omni", publish_release: false } }
 ];
 
+// ---------------------------------------------------------------------------
+// 快速套用模板：manifest 地址与分支取自各项目官方仓库实际存在的分支
+// （TWRP / PBRP / SHRP 走 GitHub API，OrangeFox 走 GitLab API，核对于 2026-11）
+// ---------------------------------------------------------------------------
+const RECOVERY_TEMPLATES = [
+  {
+    name: "TWRP",
+    manifest_url: "https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp",
+    lunch_prefix: "twrp",
+    gerrit: "https://gerrit.twrp.me",
+    branches: [
+      { b: "twrp-14.1", v: "14.1" },
+      { b: "twrp-14", v: "14" },
+      { b: "twrp-12.1", v: "12.1" },
+      { b: "twrp-11", v: "11" }
+    ]
+  },
+  {
+    name: "PBRP",
+    manifest_url: "https://github.com/PitchBlackRecoveryProject/manifest_pb",
+    lunch_prefix: "twrp",
+    branches: [
+      { b: "android-14.0", v: "14.0" },
+      { b: "android-12.1", v: "12.1" },
+      { b: "android-11.0", v: "11.0" },
+      { b: "android-10.0", v: "10.0" }
+    ],
+    note: "设备树需自带 vendor/pbrp 的配置，纯 TWRP 设备树可能因缺少 vendor/twrp 而 lunch 失败。"
+  },
+  {
+    name: "SHRP",
+    manifest_url: "https://github.com/SHRP/manifest",
+    lunch_prefix: "twrp",
+    branches: [
+      { b: "shrp-12.1", v: "12.1" },
+      { b: "v3_11.0", v: "11.0" },
+      { b: "v3_10.0", v: "10.0" }
+    ]
+  },
+  {
+    name: "OrangeFox",
+    manifest_url: "https://gitlab.com/OrangeFox/Manifest",
+    lunch_prefix: "twrp",
+    branches: [{ b: "fox_16.0", v: "16" }],
+    note: "只提供完整的 fox_16.0 manifest；fox_12.1 / fox_14.1 需要先同步 TWRP 最小 manifest 再打补丁，本工作流不支持。"
+  }
+];
+
+// 常用设备预设：设备树仓库与分支均已核对存在，device_tree_path 与 lunch 设备名一致
+const DEVICE_TEMPLATES = [
+  {
+    device: "begonia", label: "Redmi Note 8 Pro (begonia) · A11", android: "11.0",
+    url: "https://github.com/RC1844/twrp_redmi_begonia",
+    branch: "MIUI-android-11.0", path: "device/redmi/begonia"
+  },
+  {
+    device: "begonia", label: "Redmi Note 8 Pro (begonia) · A12.1", android: "12.1",
+    url: "https://github.com/begonia-recovery/twrp_device_xiaomi_begonia",
+    branch: "twrp-12.1", path: "device/xiaomi/begonia"
+  },
+  {
+    device: "sweet", label: "Redmi Note 10 Pro (sweet) · A12.1", android: "12.1",
+    url: "https://github.com/nebrassy/device_xiaomi_sweet-TWRP",
+    branch: "android-12.1", path: "device/xiaomi/sweet"
+  },
+  {
+    device: "vayu", label: "POCO X3 Pro (vayu) · A12.1", android: "12.1",
+    url: "https://github.com/nebrassy/device_xiaomi_vayu-TWRP",
+    branch: "android-12.1", path: "device/xiaomi/vayu"
+  },
+  {
+    device: "mojito", label: "Redmi Note 10 (mojito) · A11", android: "11.0",
+    url: "https://github.com/nebrassy/device_xiaomi_mojito-TWRP",
+    branch: "android-11", path: "device/xiaomi/mojito"
+  }
+];
+
 const state = { profiles: [], current: 0 };
 let envInvalid = false;
 let saveTimer = null;
-
 const els = {
   list: document.getElementById("preset-list"),
   count: document.getElementById("count"),
@@ -318,7 +415,11 @@ const els = {
   issues: document.getElementById("issues"),
   saveState: document.getElementById("save-state"),
   fProfile: document.getElementById("f-profile"),
-  fLabel: document.getElementById("f-label")
+  fLabel: document.getElementById("f-label"),
+  tplRecovery: document.getElementById("tpl-recovery"),
+  tplBranch: document.getElementById("tpl-branch"),
+  tplDevice: document.getElementById("tpl-device"),
+  tplTip: document.getElementById("tpl-tip")
 };
 
 function current() { return state.profiles[state.current]; }
@@ -584,6 +685,138 @@ function setValue(p, f, input) {
   refresh();
 }
 
+// 与 setValue 相同的取舍：等于默认值就不写进 config，保持导出的 JSON 精简
+function assignConfig(p, key, value) {
+  const f = FIELDS[key];
+  if (!f) return;
+  if (f.t === "bool") { if (value === f.d) delete p.config[key]; else p.config[key] = value; return; }
+  if (f.t === "int") {
+    const n = Number(value);
+    if (!Number.isFinite(n) || Math.trunc(n) === f.d) delete p.config[key];
+    else p.config[key] = Math.trunc(n);
+    return;
+  }
+  const s = String(value);
+  if (s.trim() === "" || s === f.d) delete p.config[key];
+  else p.config[key] = s;
+}
+
+function matchBranch(tpl, android) {
+  if (!tpl || !android) return null;
+  const major = String(android).split(".")[0];
+  return tpl.branches.find(b => b.v === android || b.v === major) || null;
+}
+
+function pickBranch(tpl, dev, prefer) {
+  if (!tpl || !tpl.branches.length) return "";
+  if (prefer && tpl.branches.some(b => b.b === prefer)) return prefer;
+  const matched = dev ? matchBranch(tpl, dev.android) : null;
+  return matched ? matched.b : tpl.branches[0].b;
+}
+
+function renderBranches(prefer, keepUnknown) {
+  const tpl = RECOVERY_TEMPLATES[Number(els.tplRecovery.value)];
+  const list = tpl ? tpl.branches : [];
+  els.tplBranch.innerHTML = "";
+  // 当前配置的分支不在模板里时（如 twrp-10.0），保留一条原样显示，避免看起来被改掉
+  if (keepUnknown && prefer && !list.some(b => b.b === prefer)) {
+    const op = document.createElement("option");
+    op.value = prefer;
+    op.textContent = prefer + "  （当前配置）";
+    els.tplBranch.appendChild(op);
+  }
+  for (const b of list) {
+    const op = document.createElement("option");
+    op.value = b.b;
+    op.textContent = b.b + "  (android " + b.v + ")";
+    els.tplBranch.appendChild(op);
+  }
+  if (prefer) els.tplBranch.value = prefer;
+}
+
+function updateTplTip() {
+  const tpl = RECOVERY_TEMPLATES[Number(els.tplRecovery.value)];
+  const dev = els.tplDevice.value === "" ? null : DEVICE_TEMPLATES[Number(els.tplDevice.value)];
+  const parts = [];
+  if (tpl) {
+    parts.push(tpl.manifest_url);
+    if (tpl.note) parts.push(tpl.note);
+  }
+  if (dev) parts.push("设备树：" + dev.url + " @" + dev.branch);
+  els.tplTip.textContent = parts.join(" · ");
+}
+
+function syncTemplateUI() {
+  const cfg = current().config;
+  let idx = RECOVERY_TEMPLATES.findIndex(t => t.manifest_url === cfg.manifest_url);
+  if (idx < 0) idx = RECOVERY_TEMPLATES.findIndex(t => t.name === cfg.recovery_name);
+  els.tplRecovery.value = String(idx < 0 ? 0 : idx);
+  renderBranches(cfg.manifest_branch || "", true);
+  const dIdx = DEVICE_TEMPLATES.findIndex(d => d.device === cfg.device && d.url === cfg.device_tree_url);
+  els.tplDevice.value = dIdx < 0 ? "" : String(dIdx);
+  updateTplTip();
+}
+
+function initTemplateSelects() {
+  RECOVERY_TEMPLATES.forEach((t, i) => {
+    const op = document.createElement("option");
+    op.value = String(i);
+    op.textContent = t.name;
+    els.tplRecovery.appendChild(op);
+  });
+  const none = document.createElement("option");
+  none.value = "";
+  none.textContent = "（不套用设备）";
+  els.tplDevice.appendChild(none);
+  DEVICE_TEMPLATES.forEach((d, i) => {
+    const op = document.createElement("option");
+    op.value = String(i);
+    op.textContent = d.label;
+    els.tplDevice.appendChild(op);
+  });
+
+  // 换 Recovery：沿用当前分支（若新模板也有），否则按设备版本或首个分支
+  els.tplRecovery.addEventListener("change", () => {
+    const tpl = RECOVERY_TEMPLATES[Number(els.tplRecovery.value)];
+    const dev = els.tplDevice.value === "" ? null : DEVICE_TEMPLATES[Number(els.tplDevice.value)];
+    renderBranches(pickBranch(tpl, dev, current().config.manifest_branch || ""), false);
+    updateTplTip();
+  });
+
+  // 换设备：切到与设备 Android 版本匹配的分支，无匹配则保留当前分支
+  els.tplDevice.addEventListener("change", () => {
+    const tpl = RECOVERY_TEMPLATES[Number(els.tplRecovery.value)];
+    const dev = els.tplDevice.value === "" ? null : DEVICE_TEMPLATES[Number(els.tplDevice.value)];
+    const matched = dev ? matchBranch(tpl, dev.android) : null;
+    renderBranches(matched ? matched.b : els.tplBranch.value, false);
+    updateTplTip();
+  });
+
+  document.getElementById("btn-apply-preset").addEventListener("click", applyPreset);
+}
+
+function applyPreset() {
+  const p = current();
+  const tpl = RECOVERY_TEMPLATES[Number(els.tplRecovery.value)];
+  if (!tpl) return;
+  const dev = els.tplDevice.value === "" ? null : DEVICE_TEMPLATES[Number(els.tplDevice.value)];
+
+  assignConfig(p, "recovery_name", tpl.name);
+  assignConfig(p, "manifest_url", tpl.manifest_url);
+  assignConfig(p, "manifest_branch", els.tplBranch.value);
+  if (tpl.lunch_prefix) assignConfig(p, "lunch_prefix", tpl.lunch_prefix);
+  if (tpl.gerrit) assignConfig(p, "repopick_gerrit", tpl.gerrit);
+
+  if (dev) {
+    assignConfig(p, "device", dev.device);
+    assignConfig(p, "device_tree_url", dev.url);
+    assignConfig(p, "device_tree_branch", dev.branch);
+    assignConfig(p, "device_tree_path", dev.path);
+  }
+  renderForm();
+  scheduleSave();
+}
+
 function renderForm() {
   const p = current();
   envInvalid = false;
@@ -601,6 +834,7 @@ function renderForm() {
     sec.append(h, grid);
     els.sections.appendChild(sec);
   }
+  syncTemplateUI();
   refresh();
 }
 
@@ -759,6 +993,7 @@ els.fLabel.addEventListener("input", () => {
 });
 
 loadState();
+initTemplateSelects();
 renderForm();
 </script>
 </body>
