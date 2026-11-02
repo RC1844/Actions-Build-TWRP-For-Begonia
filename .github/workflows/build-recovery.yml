@@ -32,8 +32,9 @@ name: Reusable Recovery Build
 #
 # 说明：
 #   · 运行环境默认 ubuntu-24.04（当前最新 LTS 托管镜像）。Android 12 及以上分支可直接使用；
-#     Android 10/11 等 legacy 分支的预编译工具依赖 openjdk-8、libncurses5、libtinfo5 等
-#     仅 22.04 提供（或仍提供）的包，这类目标请显式传 runner: ubuntu-22.04。
+#     Android 10/11 等 legacy 分支需要的 libncurses5 / libtinfo5 等包在 24.04 已移除，
+#     流水线会自动从 22.04(jammy) 源下载同名 deb 补装；openjdk-8 则需要 config.java_version: 8
+#     由 setup-java 安装 Temurin 8（或显式传 runner: ubuntu-22.04）。
 #   · JDK 版本由 config.java_version 控制：留空表示沿用镜像自带 JDK；需要固定版本时
 #     填写 8 / 11 / 17 / 21，由 actions/setup-java 安装 Temurin 对应版本。
 #   · 需要加密/解密等敏感值请使用 config_file 配合仓库 Secrets 或 vars，不要写进
@@ -474,13 +475,6 @@ jobs:
             squashfs-tools xsltproc zip zlib1g-dev python3 python-is-python3 libncurses-dev \
             ${EXTRA_PACKAGES:-}"
 
-          # 兼容依赖：24.04 已移除（或 legacy 分支才需要），装不上只告警不中断。
-          # openjdk-8 仅在未通过 config.java_version 指定 JDK 时尝试安装。
-          COMPAT_PKGS="libncurses5 libtinfo5 lib32ncurses5-dev"
-          if [ -z "${JAVA_VERSION:-}" ]; then
-            COMPAT_PKGS="$COMPAT_PKGS openjdk-8-jdk"
-          fi
-
           if ! sudo -E DEBIAN_FRONTEND=noninteractive apt-get -qq install -y $BASE_PKGS; then
             echo "批量安装失败，改为逐个安装并跳过当前镜像不提供的包"
             for p in $BASE_PKGS; do
@@ -489,10 +483,38 @@ jobs:
             done
           fi
 
+          # 兼容依赖：legacy（Android 10/11）分支的预编译二进制需要 ncurses5 / tinfo5，
+          # ubuntu-24.04 已从仓库移除，这里回退到 22.04(jammy) 的同名 deb 一并离线安装。
+          COMPAT_PKGS="libncurses5 libtinfo5 lib32ncurses5-dev"
+          JAMMY_PKGS="libncurses5 libtinfo5 lib32ncurses5 lib32tinfo5 lib32ncurses5-dev"
+          pool="https://archive.ubuntu.com/ubuntu/pool/universe/n/ncurses"
+          missing=""
           for p in $COMPAT_PKGS; do
             sudo -E DEBIAN_FRONTEND=noninteractive apt-get -qq install -y "$p" \
-              || echo "::warning::兼容依赖 $p 在当前镜像（$(. /etc/os-release && echo "$PRETTY_NAME")）不可用，已跳过"
+              || missing="$missing $p"
           done
+
+          if [ -n "$missing" ]; then
+            index="$(curl -fsSL "$pool/" || true)"
+            debs=()
+            for p in $JAMMY_PKGS; do
+              f="$(printf '%s' "$index" | grep -oE "${p}_[^\"<]*_amd64\.deb" | sort -V | tail -n1 || true)"
+              [ -n "$f" ] || continue
+              curl -fsSL -o "$RUNNER_TEMP/$f" "$pool/$f" || continue
+              debs+=("$RUNNER_TEMP/$f")
+            done
+            if [ "${#debs[@]}" -eq 5 ] && sudo dpkg -i "${debs[@]}"; then
+              echo "已从 Ubuntu 22.04 源补装:$missing"
+            else
+              echo "::warning::兼容依赖$missing 在当前镜像（$(. /etc/os-release && echo "$PRETTY_NAME")）不可用，已跳过"
+            fi
+          fi
+
+          # openjdk-8：24.04 不再提供；需要 JDK 8 的目标请用 config.java_version: 8 交给 setup-java。
+          if [ -z "${JAVA_VERSION:-}" ]; then
+            sudo -E DEBIAN_FRONTEND=noninteractive apt-get -qq install -y openjdk-8-jdk \
+              || echo "::warning::openjdk-8 在当前镜像不可用；Android 10 等目标请设置 java_version: 8"
+          fi
 
       - name: Set timezone
         if: ${{ env.VALIDATE_ONLY != 'true' }}
@@ -918,9 +940,20 @@ jobs:
 
       - name: Delete old releases
         if: ${{ env.VALIDATE_ONLY != 'true' && env.PUBLISH_RELEASE == 'true' && env.KEEP_RELEASES != '0' }}
-        uses: dev-drprasad/delete-older-releases@v0.3.4
-        with:
-          keep_latest: ${{ fromJSON(env.KEEP_RELEASES) }}
-          delete_tags: true
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          keep="${KEEP_RELEASES}"
+          mapfile -t tags < <(gh release list --limit 200 --json tagName,createdAt \
+            --jq 'sort_by(.createdAt) | reverse | .[].tagName')
+          if [ "${#tags[@]}" -le "$keep" ]; then
+            echo "共 ${#tags[@]} 个 Release，保留 $keep 个，无需清理"
+            exit 0
+          fi
+          for tag in "${tags[@]:keep}"; do
+            echo "删除旧 Release: $tag"
+            gh release delete "$tag" --yes --cleanup-tag \
+              || echo "::warning::删除旧 Release $tag 失败，已跳过"
+          done
