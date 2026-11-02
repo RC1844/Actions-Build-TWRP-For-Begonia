@@ -11,7 +11,7 @@
       "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
       "device_tree_branch": "MIUI-android-11.0",
       "device_tree_path": "device/redmi/begonia",
-      "device_patch_script": "patch_fbe_unmount.sh",
+      "device_patch_script": ".github/scripts/patch_fbe_unmount.sh",
       "lunch_prefix": "twrp",
       "publish_release": false
     }
@@ -28,6 +28,7 @@
       "device_tree_url": "https://github.com/shhhamik/twrp_device_xiaomi_begonia",
       "device_tree_branch": "twrp-12.1",
       "device_tree_path": "device/xiaomi/begonia",
+      "device_patch_script": ".github/scripts/patch_fbe_unmount.sh",
       "lunch_prefix": "twrp",
       "java_version": "11",
       "publish_release": false
@@ -46,7 +47,7 @@
       "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
       "device_tree_branch": "MIUI-android-11.0",
       "device_tree_path": "device/redmi/begonia",
-      "device_patch_script": "patch_fbe_unmount.sh",
+      "device_patch_script": ".github/scripts/patch_fbe_unmount.sh",
       "lunch_prefix": "twrp",
       "publish_release": false
     }
@@ -63,7 +64,7 @@
       "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
       "device_tree_branch": "MIUI-android-11.0",
       "device_tree_path": "device/redmi/begonia",
-      "device_patch_script": "patch_fbe_unmount.sh",
+      "device_patch_script": ".github/scripts/patch_fbe_unmount.sh",
       "lunch_prefix": "omni",
       "publish_release": false
     }
@@ -80,6 +81,7 @@
       "device_tree_url": "https://github.com/shhhamik/twrp_device_xiaomi_begonia",
       "device_tree_branch": "twrp-12.1",
       "device_tree_path": "device/xiaomi/begonia",
+      "device_patch_script": ".github/scripts/patch_fbe_unmount.sh",
       "lunch_prefix": "twrp",
       "java_version": "11",
       "publish_release": false
@@ -97,7 +99,7 @@
       "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
       "device_tree_branch": "MIUI-android-11.0",
       "device_tree_path": "device/redmi/begonia",
-      "device_patch_script": "patch_fbe_unmount.sh",
+      "device_patch_script": ".github/scripts/patch_fbe_unmount.sh",
       "lunch_prefix": "twrp",
       "build_env": {
         "FOX_USE_TWRP_RECOVERY_IMAGE_BUILDER": "1",
@@ -119,6 +121,7 @@
       "device_tree_url": "https://github.com/shhhamik/twrp_device_xiaomi_begonia",
       "device_tree_branch": "twrp-12.1",
       "device_tree_path": "device/xiaomi/begonia",
+      "device_patch_script": ".github/scripts/patch_fbe_unmount.sh",
       "lunch_prefix": "twrp",
       "java_version": "11",
       "build_env": {

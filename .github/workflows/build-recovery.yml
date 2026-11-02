@@ -77,7 +77,7 @@ name: Reusable Recovery Build
 # | common_tree_url           | string | ""                                              | 公共设备树地址；多机型共用树（sm8250-common 之类）时填写 |
 # | common_tree_branch        | string | ""                                              | 公共设备树分支；空则用仓库默认分支 |
 # | common_tree_path          | string | ""                                              | 公共设备树放置路径，如 device/<vendor>/sm8250-common |
-# | device_patch_script       | string | ""                                              | 设备树内补丁脚本（相对设备树根），如 prebuilt/sourcecode/patch.sh；非空则克隆后执行，失败仅告警 |
+# | device_patch_script       | string | ""                                              | 设备树克隆后执行的补丁脚本（相对路径）：先查仓库根目录，再查设备树根；失败仅告警 |
 # | dependencies_local_manifest | bool | false                                           | 是否把设备树 *.dependencies 转成 .repo/local_manifests/roomservice.xml 并补一次 sync 拉依赖 |
 # | repopick_patches          | string | ""                                              | 空格分隔的 Gerrit change 号，envsetup 后、lunch 前执行 repopick |
 # | repopick_gerrit           | string | "https://gerrit.twrp.me"                        | repopick -g 使用的 Gerrit 地址 |
@@ -721,15 +721,22 @@ jobs:
             fi
           fi
 
-          # 可选：执行设备树自带补丁脚本（展锐等 prebuilt / 无源码场景常用）
+          # 可选：执行补丁脚本（仓库内路径优先，其次设备树根；设备树自带的脚本常只适配单一 recovery）
           if [ -n "${DEVICE_PATCH_SCRIPT:-}" ]; then
-            patch_target="$DEVICE_TREE_PATH/$DEVICE_PATCH_SCRIPT"
-            if [ -f "$patch_target" ]; then
-              chmod +x "$patch_target"
+            patch_target=""
+            if [ -f "$GITHUB_WORKSPACE/$DEVICE_PATCH_SCRIPT" ]; then
+              patch_target="$(basename "$DEVICE_PATCH_SCRIPT")"
+              cp "$GITHUB_WORKSPACE/$DEVICE_PATCH_SCRIPT" "$patch_target"
+              echo "执行仓库内补丁脚本：$DEVICE_PATCH_SCRIPT"
+            elif [ -f "$DEVICE_TREE_PATH/$DEVICE_PATCH_SCRIPT" ]; then
+              patch_target="$DEVICE_TREE_PATH/$DEVICE_PATCH_SCRIPT"
               echo "执行设备树补丁脚本：$patch_target"
+            fi
+            if [ -n "$patch_target" ]; then
+              chmod +x "$patch_target"
               ( cd "$(dirname "$patch_target")" && "./$(basename "$patch_target")" ) || echo "::warning::补丁脚本返回非零，继续构建"
             else
-              echo "::warning::device_patch_script 指向的脚本不存在：$patch_target"
+              echo "::warning::device_patch_script 指向的脚本不存在：$DEVICE_PATCH_SCRIPT"
             fi
           fi
 
