@@ -28,6 +28,7 @@
       "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
       "device_tree_branch": "MIUI-android-11.0",
       "device_tree_path": "device/redmi/begonia",
+      "device_patch_script": "patch_fbe_unmount.sh",
       "lunch_prefix": "twrp",
       "publish_release": false
     }
@@ -44,6 +45,7 @@
       "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
       "device_tree_branch": "MIUI-android-11.0",
       "device_tree_path": "device/redmi/begonia",
+      "device_patch_script": "patch_fbe_unmount.sh",
       "lunch_prefix": "twrp",
       "publish_release": false
     }
@@ -60,7 +62,69 @@
       "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
       "device_tree_branch": "MIUI-android-11.0",
       "device_tree_path": "device/redmi/begonia",
+      "device_patch_script": "patch_fbe_unmount.sh",
       "lunch_prefix": "omni",
+      "publish_release": false
+    }
+  },
+  {
+    "profile": "twrp-3.7.1-twrp12",
+    "label": "TWRP 3.7.1 / twrp-12.1",
+    "config": {
+      "recovery_name": "TWRP",
+      "recovery_version": "3.7.1",
+      "device": "begonia",
+      "manifest_url": "https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp",
+      "manifest_branch": "twrp-12.1",
+      "device_tree_url": "https://github.com/shhhamik/twrp_device_xiaomi_begonia",
+      "device_tree_branch": "twrp-12.1",
+      "device_tree_path": "device/xiaomi/begonia",
+      "lunch_prefix": "twrp",
+      "java_version": "11",
+      "publish_release": false
+    }
+  },
+  {
+    "profile": "ofox-fox_11.0",
+    "label": "OrangeFox 11.0 (fox_11.0)",
+    "config": {
+      "recovery_name": "OrangeFox",
+      "recovery_version": "11.0",
+      "device": "begonia",
+      "source_sync": "orangefox",
+      "orangefox_branch": "11.0",
+      "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
+      "device_tree_branch": "MIUI-android-11.0",
+      "device_tree_path": "device/redmi/begonia",
+      "device_patch_script": "patch_fbe_unmount.sh",
+      "lunch_prefix": "twrp",
+      "build_env": {
+        "FOX_USE_TWRP_RECOVERY_IMAGE_BUILDER": "1",
+        "OF_SCREEN_H": "2160",
+        "OF_PATCH_AVB20": "1"
+      },
+      "publish_release": false
+    }
+  },
+  {
+    "profile": "ofox-fox_12.1",
+    "label": "OrangeFox 12.1 (fox_12.1)",
+    "config": {
+      "recovery_name": "OrangeFox",
+      "recovery_version": "12.1",
+      "device": "begonia",
+      "source_sync": "orangefox",
+      "orangefox_branch": "12.1",
+      "device_tree_url": "https://github.com/shhhamik/twrp_device_xiaomi_begonia",
+      "device_tree_branch": "twrp-12.1",
+      "device_tree_path": "device/xiaomi/begonia",
+      "lunch_prefix": "twrp",
+      "java_version": "11",
+      "build_env": {
+        "FOX_USE_TWRP_RECOVERY_IMAGE_BUILDER": "1",
+        "OF_SCREEN_H": "2160",
+        "OF_PATCH_AVB20": "1"
+      },
       "publish_release": false
     }
   }
