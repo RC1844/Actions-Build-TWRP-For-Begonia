@@ -69,6 +69,7 @@ name: Reusable Recovery Build
 # | orangefox_sync_url        | string | "https://gitlab.com/OrangeFox/sync.git"         | orangefox 同步脚本所在仓库 |
 # | manifest_depth            | int    | 1                                               | repo init --depth；0 = 完整历史（范围 ≥ 0）；source_sync=orangefox 时不生效 |
 # | manifest_groups           | string | "all,-notdefault,-device,-darwin,-x86,-mips"     | repo init --groups；空字符串表示不传该参数 |
+# | repo_remove_projects      | string | ""                                              | 空格分隔的项目名，写入 local manifest 的 remove-project 以屏蔽上游失效/多余项目 |
 # | workspace_dir             | string | "workspace"                                     | 源码工作目录（相对仓库根目录） |
 # | device_tree_url           | string | ""                                              | 设备树仓库地址。【必填】 |
 # | device_tree_branch        | string | ""                                              | 设备树分支；空则使用仓库默认分支 |
@@ -206,6 +207,7 @@ jobs:
           "orangefox_sync_url": "https://gitlab.com/OrangeFox/sync.git",
           "manifest_depth": 1,
           "manifest_groups": "all,-notdefault,-device,-darwin,-x86,-mips",
+          "repo_remove_projects": "",
           "workspace_dir": "workspace",
           "device_tree_url": "",
           "device_tree_branch": "",
@@ -575,9 +577,9 @@ jobs:
           cd "$WORKSPACE_DIR"
           ws="$(pwd)"
 
-          # OrangeFox legacy 分支（11.0 / 12.1 / 14.1）上游没有完整 manifest：
-          # 官方 sync 脚本会先 repo init TWRP 最小 manifest，再注入补丁与 local manifest，
-          # 因此这三条分支走脚本，manifest_depth / manifest_groups 不生效。
+          # OrangeFox legacy 分支上游没有完整 manifest：官方 sync 脚本会先 repo init TWRP
+          # 最小 manifest，再注入补丁与 local manifest。12.1 / 14.1 / 16.0 用主脚本，
+          # 9.0 / 10.0 / 11.0 主脚本已不支持，改用仓库内 legacy/orangefox_sync_legacy.sh。
           if [ "${SOURCE_SYNC:-repo}" = "orangefox" ]; then
             fox="${ORANGEFOX_BRANCH:-}"
             [ -n "$fox" ] || fox="${MANIFEST_BRANCH#fox_}"
@@ -585,16 +587,48 @@ jobs:
             if [ "${MANIFEST_DEPTH:-1}" != "1" ] || [ "${MANIFEST_GROUPS:-all,-notdefault,-device,-darwin,-x86,-mips}" != "all,-notdefault,-device,-darwin,-x86,-mips" ]; then
               echo "::warning::source_sync=orangefox 时 manifest_depth / manifest_groups 不生效"
             fi
+            sync_script="orangefox_sync.sh"
+            case "$fox" in
+              12.1|14.1|16.0) ;;
+              9.0|10.0|11.0) sync_script="legacy/orangefox_sync_legacy.sh" ;;
+              *)
+                echo "::error::fox_${fox} 不受支持（主脚本支持 12.1 / 14.1 / 16.0，legacy 脚本支持 9.0 / 10.0 / 11.0）"
+                exit 1
+                ;;
+            esac
             tmp="$(mktemp -d)"
-            echo "::group::orangefox_sync.sh --branch $fox"
+            echo "::group::$sync_script --branch $fox"
             git clone --depth=1 --single-branch "$sync_url" "$tmp/sync"
-            chmod +x "$tmp/sync/orangefox_sync.sh"
-            ( cd "$tmp/sync" && ./orangefox_sync.sh --branch "$fox" --path "$ws" --ssh 0 )
+            if [ ! -f "$tmp/sync/$sync_script" ]; then
+              echo "::error::上游 sync 仓库中不存在 $sync_script（$sync_url）"
+              exit 1
+            fi
+            chmod +x "$tmp/sync/$sync_script"
+            # 脚本遇到不支持的分支只打印帮助并 exit 0，因此必须自行校验同步结果
+            ( cd "$tmp/sync" && "./$sync_script" --branch "$fox" --path "$ws" --ssh 0 )
             echo "::endgroup::"
+            if [ ! -f "$ws/build/envsetup.sh" ]; then
+              echo "::error::orangefox_sync.sh 未生成 $ws/build/envsetup.sh，fox_${fox} 源码同步失败"
+              exit 1
+            fi
             # 后续步骤（缓存键、构建摘要、Release 说明）统一使用 fox 分支名
             [ -n "${MANIFEST_URL:-}" ] || echo "MANIFEST_URL=https://gitlab.com/OrangeFox/Manifest" >> "$GITHUB_ENV"
             [ -n "${MANIFEST_BRANCH:-}" ] || echo "MANIFEST_BRANCH=fox_${fox}" >> "$GITHUB_ENV"
             exit 0
+          fi
+
+          # 屏蔽上游失效或不需要的项目（local manifest 的 remove-project）
+          if [ -n "${REPO_REMOVE_PROJECTS:-}" ]; then
+            mkdir -p .repo/local_manifests
+            {
+              echo '<?xml version="1.0" encoding="UTF-8"?>'
+              echo '<manifest>'
+              for p in $REPO_REMOVE_PROJECTS; do
+                echo "  <remove-project name=\"$p\" />"
+              done
+              echo '</manifest>'
+            } > .repo/local_manifests/zz-remove-projects.xml
+            echo "已屏蔽项目：$REPO_REMOVE_PROJECTS"
           fi
 
           init_args=()
@@ -730,8 +764,18 @@ jobs:
           cd "$WORKSPACE_DIR"
 
           echo "::group::envsetup"
-          source build/envsetup.sh
+          # OrangeFox 注入的 orangefox_envsetup() 末行是 `[ -s ... ] && echo ...`，
+          # 条件不成立时整个 envsetup.sh 返回 1；官方手工流程同样是 `|| true`。
+          # 这里只告警不中断，随后用 lunch/mka 是否存在做真实校验。
+          source build/envsetup.sh || echo "::warning::build/envsetup.sh 返回非零（OrangeFox 补丁常见），继续执行"
           echo "::endgroup::"
+
+          for fn in lunch mka; do
+            if ! declare -F "$fn" > /dev/null; then
+              echo "::error::envsetup 未生效：找不到 $fn 函数（请检查 build/envsetup.sh 日志）"
+              exit 1
+            fi
+          done
 
           if [ "${ALLOW_MISSING_DEPENDENCIES:-false}" = "true" ]; then
             export ALLOW_MISSING_DEPENDENCIES=true

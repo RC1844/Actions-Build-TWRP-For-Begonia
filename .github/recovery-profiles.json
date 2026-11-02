@@ -17,19 +17,19 @@
     }
   },
   {
-    "profile": "pbrp-3.1.0",
-    "label": "PBRP 3.1.0",
+    "profile": "pbrp-12.1",
+    "label": "PBRP / android-12.1",
     "config": {
       "recovery_name": "PBRP",
-      "recovery_version": "3.1.0",
+      "recovery_version": "12.1",
       "device": "begonia",
       "manifest_url": "https://github.com/PitchBlackRecoveryProject/manifest_pb",
-      "manifest_branch": "android-11.0",
-      "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
-      "device_tree_branch": "MIUI-android-11.0",
-      "device_tree_path": "device/redmi/begonia",
-      "device_patch_script": "patch_fbe_unmount.sh",
+      "manifest_branch": "android-12.1",
+      "device_tree_url": "https://github.com/shhhamik/twrp_device_xiaomi_begonia",
+      "device_tree_branch": "twrp-12.1",
+      "device_tree_path": "device/xiaomi/begonia",
       "lunch_prefix": "twrp",
+      "java_version": "11",
       "publish_release": false
     }
   },
@@ -42,6 +42,7 @@
       "device": "begonia",
       "manifest_url": "https://github.com/SHRP/manifest",
       "manifest_branch": "v3_11.0",
+      "repo_remove_projects": "phhusson/vendor_lptools",
       "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
       "device_tree_branch": "MIUI-android-11.0",
       "device_tree_path": "device/redmi/begonia",
@@ -51,14 +52,14 @@
     }
   },
   {
-    "profile": "twrp-3.6.0-omni",
-    "label": "TWRP 3.6.0 / twrp-10.0 (omni)",
+    "profile": "twrp-omni-11.0",
+    "label": "TWRP / twrp-11.0 (omni)",
     "config": {
       "recovery_name": "TWRP",
-      "recovery_version": "3.6.0",
+      "recovery_version": "11.0",
       "device": "begonia",
       "manifest_url": "https://github.com/RC1844/platform_manifest_twrp_omni",
-      "manifest_branch": "twrp-10.0",
+      "manifest_branch": "twrp-11.0",
       "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
       "device_tree_branch": "MIUI-android-11.0",
       "device_tree_path": "device/redmi/begonia",

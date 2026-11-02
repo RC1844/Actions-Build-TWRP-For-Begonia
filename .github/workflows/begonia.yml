@@ -23,9 +23,9 @@ on:
           # <sync-form:profile>
           - all
           - twrp-3.7.0-twrp11
-          - pbrp-3.1.0
+          - pbrp-12.1
           - shrp-v3_11.0
-          - twrp-3.6.0-omni
+          - twrp-omni-11.0
           - twrp-3.7.1-twrp12
           - ofox-fox_11.0
           - ofox-fox_12.1
@@ -62,9 +62,9 @@ on:
           # <sync-form:manifest_branch>
           - 跟随预设
           - twrp-11
-          - android-11.0
+          - android-12.1
           - v3_11.0
-          - twrp-10.0
+          - twrp-11.0
           - twrp-12.1
           # </sync-form:manifest_branch>
       build_target:
