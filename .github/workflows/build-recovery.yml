@@ -904,18 +904,26 @@ jobs:
 
           DATETIME="$(TZ="${TZ:-Asia/Shanghai}" date +%Y%m%d-%H%M)"
           HUMAN_DATETIME="$(TZ="${TZ:-Asia/Shanghai}" date +%Y-%m-%d\ %H:%M)"
-          SAFE_NAME="$RECOVERY_NAME"
-          SAFE_NAME="${SAFE_NAME// /-}"
-          SAFE_NAME="${SAFE_NAME//\//-}"
-          SAFE_VERSION="$RECOVERY_VERSION"
-          SAFE_VERSION="${SAFE_VERSION// /-}"
+
+          # Recovery 标识：名称 + 版本，做文件名安全化（空格/斜杠/括号清成横杠）
+          RECOVERY_SAFE="${RECOVERY_NAME// /-}"
+          RECOVERY_SAFE="${RECOVERY_SAFE//\//-}"
+          RECOVERY_SAFE="${RECOVERY_SAFE//(/}"
+          RECOVERY_SAFE="${RECOVERY_SAFE//)/}"
+          SAFE_VERSION="${RECOVERY_VERSION// /-}"
           SAFE_VERSION="${SAFE_VERSION//\//-}"
           SAFE_VERSION="${SAFE_VERSION#v}"
           SAFE_VERSION="${SAFE_VERSION#V}"
-          TAG="${DEVICE}-${SAFE_NAME}-v${SAFE_VERSION}-${DATETIME}-run${GITHUB_RUN_NUMBER}"
-          ZIP_NAME="${SAFE_NAME}-v${SAFE_VERSION}-${DEVICE}-${DATETIME}-run${GITHUB_RUN_NUMBER}.zip"
-          DEFAULT_ARTIFACT="${SAFE_NAME}-v${SAFE_VERSION}-${DEVICE}"
-          RELEASE_TITLE="${SAFE_NAME} v${SAFE_VERSION} for ${DEVICE} · ${HUMAN_DATETIME}"
+          RECOVERY_ID="${RECOVERY_SAFE}"
+          [ -n "${SAFE_VERSION:-}" ] && RECOVERY_ID="${RECOVERY_ID}-v${SAFE_VERSION}"
+          RECOVERY_ID="${RECOVERY_ID//--/-}"
+
+          DEFAULT_ARTIFACT="${RECOVERY_ID}-${DEVICE}"
+          RELEASE_TITLE="${RECOVERY_ID} for ${DEVICE} · ${HUMAN_DATETIME}"
+
+          # 统一命名：设备 + recovery 标识 + 时间戳（可选 run 号做唯一化）
+          TAG="${DEVICE}-${RECOVERY_ID}-${DATETIME}"
+          ZIP_NAME="${DEVICE}-${RECOVERY_ID}-${DATETIME}-run${GITHUB_RUN_NUMBER}.zip"
 
           pushd "$OUT" >/dev/null
           rm -f "$ZIP_NAME" "$ZIP_NAME.sha256"
