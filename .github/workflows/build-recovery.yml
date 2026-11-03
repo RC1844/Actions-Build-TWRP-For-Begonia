@@ -883,11 +883,19 @@ jobs:
           fi
 
           DATETIME="$(TZ="${TZ:-Asia/Shanghai}" date +%Y%m%d-%H%M)"
+          HUMAN_DATETIME="$(TZ="${TZ:-Asia/Shanghai}" date +%Y-%m-%d\ %H:%M)"
           SAFE_NAME="$RECOVERY_NAME"
           SAFE_NAME="${SAFE_NAME// /-}"
           SAFE_NAME="${SAFE_NAME//\//-}"
-          TAG="${DEVICE}-${SAFE_NAME}-${DATETIME}-${GITHUB_RUN_NUMBER}"
-          ZIP_NAME="${SAFE_NAME}_${DEVICE}_${DATETIME}_${GITHUB_RUN_NUMBER}.zip"
+          SAFE_VERSION="$RECOVERY_VERSION"
+          SAFE_VERSION="${SAFE_VERSION// /-}"
+          SAFE_VERSION="${SAFE_VERSION//\//-}"
+          SAFE_VERSION="${SAFE_VERSION#v}"
+          SAFE_VERSION="${SAFE_VERSION#V}"
+          TAG="${DEVICE}-${SAFE_NAME}-v${SAFE_VERSION}-${DATETIME}-run${GITHUB_RUN_NUMBER}"
+          ZIP_NAME="${SAFE_NAME}-v${SAFE_VERSION}-${DEVICE}-${DATETIME}-run${GITHUB_RUN_NUMBER}.zip"
+          DEFAULT_ARTIFACT="${SAFE_NAME}-v${SAFE_VERSION}-${DEVICE}"
+          RELEASE_TITLE="${SAFE_NAME} v${SAFE_VERSION} for ${DEVICE} · ${HUMAN_DATETIME}"
 
           pushd "$OUT" >/dev/null
           rm -f "$ZIP_NAME" "$ZIP_NAME.sha256"
@@ -913,10 +921,12 @@ jobs:
           manifest: $MANIFEST_URL @ $MANIFEST_BRANCH
           device_tree: $DEVICE_TREE_URL @ ${DEVICE_TREE_BRANCH:-<default>}
           build_target: ${BUILD_TARGET_NORMALIZED:-$BUILD_TARGET}
-          built_at: $DATETIME (${TZ:-Asia/Shanghai})
+          built_at: $HUMAN_DATETIME (${TZ:-Asia/Shanghai})
           commit: $GITHUB_SHA
           run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
           image: $(basename "$IMG") (${size_mb}MB)
+          zip: $ZIP_NAME
+          sha256: ${ZIP_NAME}.sha256
           EOF
           zip -9 "$ZIP_NAME" build_info.txt
           sha256sum "$ZIP_NAME" > "$ZIP_NAME.sha256"
@@ -925,13 +935,15 @@ jobs:
           {
             echo "tag=$TAG"
             echo "datetime=$DATETIME"
+            echo "human_datetime=$HUMAN_DATETIME"
+            echo "release_title=$RELEASE_TITLE"
             echo "out_dir=$OUT"
             echo "zip_path=$OUT/$ZIP_NAME"
             echo "zip_name=$ZIP_NAME"
             echo "sha_path=$OUT/$ZIP_NAME.sha256"
             echo "img_name=$(basename "$IMG")"
             echo "img_size_mb=$size_mb"
-            echo "artifact=${ARTIFACT_NAME:-${RECOVERY_NAME}_${DEVICE}-${GITHUB_RUN_NUMBER}}"
+            echo "artifact=${ARTIFACT_NAME:-$DEFAULT_ARTIFACT}"
           } >> "$GITHUB_OUTPUT"
 
           {
@@ -966,17 +978,17 @@ jobs:
         with:
           token: ${{ github.token }}
           tag_name: ${{ steps.pack.outputs.tag }}
-          name: ${{ env.RECOVERY_NAME }} ${{ env.RECOVERY_VERSION }} | ${{ env.DEVICE }} | ${{ steps.pack.outputs.datetime }}
+          name: ${{ steps.pack.outputs.release_title }}
           prerelease: ${{ env.RELEASE_PRERELEASE == 'true' }}
           files: |
             ${{ steps.pack.outputs.zip_path }}
             ${{ steps.pack.outputs.sha_path }}
           body: |
-            **${{ env.RECOVERY_NAME }} ${{ env.RECOVERY_VERSION }}** for `${{ env.DEVICE }}`
+            **${{ env.RECOVERY_NAME }} v${{ env.RECOVERY_VERSION }}** for `${{ env.DEVICE }}`
 
             | 项目 | 值 |
             | --- | --- |
-            | 构建时间 | ${{ steps.pack.outputs.datetime }} (${{ env.TZ }}) |
+            | 构建时间 | ${{ steps.pack.outputs.human_datetime }} (${{ env.TZ }}) |
             | 源码 | `${{ env.MANIFEST_URL }}` @ `${{ env.MANIFEST_BRANCH }}` |
             | 设备树 | `${{ env.DEVICE_TREE_URL }}` @ `${{ env.DEVICE_TREE_BRANCH }}` |
             | 构建目标 | `${{ env.BUILD_TARGET }}` |
