@@ -43,7 +43,6 @@
       "device": "begonia",
       "manifest_url": "https://github.com/SHRP/manifest",
       "manifest_branch": "v3_11.0",
-      "repo_remove_projects": "phhusson/vendor_lptools",
       "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
       "device_tree_branch": "MIUI-android-11.0",
       "device_tree_path": "device/redmi/begonia",
