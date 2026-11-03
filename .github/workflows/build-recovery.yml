@@ -604,8 +604,10 @@ jobs:
               exit 1
             fi
             chmod +x "$tmp/sync/$sync_script"
-            # 脚本遇到不支持的分支只打印帮助并 exit 0，因此必须自行校验同步结果
-            ( cd "$tmp/sync" && "./$sync_script" --branch "$fox" --path "$ws" --ssh 0 )
+            # 脚本遇到不支持的分支只打印帮助并 exit 0，因此必须自行校验同步结果。
+            # legacy 脚本内部按 $BASE_DIR/patches 查找补丁，而上游已把补丁移到 legacy/patches，
+            # 因此必须从脚本所在目录执行（legacy 分支即 legacy/，主脚本仍在仓库根目录）。
+            ( cd "$tmp/sync/$(dirname "$sync_script")" && "./$(basename "$sync_script")" --branch "$fox" --path "$ws" --ssh 0 )
             echo "::endgroup::"
             if [ ! -f "$ws/build/envsetup.sh" ]; then
               echo "::error::orangefox_sync.sh 未生成 $ws/build/envsetup.sh，fox_${fox} 源码同步失败"

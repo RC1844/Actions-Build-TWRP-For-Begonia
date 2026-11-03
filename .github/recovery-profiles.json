@@ -49,23 +49,7 @@
       "device_tree_path": "device/redmi/begonia",
       "device_patch_script": ".github/scripts/patch_fbe_unmount.sh",
       "lunch_prefix": "twrp",
-      "publish_release": false
-    }
-  },
-  {
-    "profile": "twrp-omni-11.0",
-    "label": "TWRP / twrp-11.0 (omni)",
-    "config": {
-      "recovery_name": "TWRP",
-      "recovery_version": "11.0",
-      "device": "begonia",
-      "manifest_url": "https://github.com/RC1844/platform_manifest_twrp_omni",
-      "manifest_branch": "twrp-11.0",
-      "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
-      "device_tree_branch": "MIUI-android-11.0",
-      "device_tree_path": "device/redmi/begonia",
-      "device_patch_script": ".github/scripts/patch_fbe_unmount.sh",
-      "lunch_prefix": "omni",
+      "extra_packages": "python2.7",
       "publish_release": false
     }
   },
