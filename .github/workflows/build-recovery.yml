@@ -881,11 +881,19 @@ jobs:
           fi
 
           DATETIME="$(TZ="${TZ:-Asia/Shanghai}" date +%Y%m%d-%H%M)"
-          SAFE_NAME="$RECOVERY_NAME"
-          SAFE_NAME="${SAFE_NAME// /-}"
-          SAFE_NAME="${SAFE_NAME//\//-}"
-          TAG="${DEVICE}-${SAFE_NAME}-${DATETIME}-${GITHUB_RUN_NUMBER}"
-          ZIP_NAME="${SAFE_NAME}_${DEVICE}_${DATETIME}_${GITHUB_RUN_NUMBER}.zip"
+
+          # Recovery 标识：名称 + 版本，做文件名安全化（空格/斜杠/括号清成横杠）
+          RECOVERY_SAFE="${RECOVERY_NAME// /-}"
+          RECOVERY_SAFE="${RECOVERY_SAFE//\//-}"
+          RECOVERY_SAFE="${RECOVERY_SAFE//(/}"
+          RECOVERY_SAFE="${RECOVERY_SAFE//)/}"
+          RECOVERY_ID="${RECOVERY_SAFE}"
+          [ -n "${RECOVERY_VERSION:-}" ] && RECOVERY_ID="${RECOVERY_ID}-${RECOVERY_VERSION}"
+          RECOVERY_ID="${RECOVERY_ID//--/-}"
+
+          # 统一命名：设备 + recovery 标识 + 时间戳（可选 run 号做唯一化）
+          TAG="${DEVICE}-${RECOVERY_ID}-${DATETIME}"
+          ZIP_NAME="${DEVICE}-${RECOVERY_ID}-${DATETIME}-run${GITHUB_RUN_NUMBER}.zip"
 
           pushd "$OUT" >/dev/null
           rm -f "$ZIP_NAME" "$ZIP_NAME.sha256"
@@ -929,7 +937,7 @@ jobs:
             echo "sha_path=$OUT/$ZIP_NAME.sha256"
             echo "img_name=$(basename "$IMG")"
             echo "img_size_mb=$size_mb"
-            echo "artifact=${ARTIFACT_NAME:-${RECOVERY_NAME}_${DEVICE}-${GITHUB_RUN_NUMBER}}"
+            echo "artifact=${ARTIFACT_NAME:-${DEVICE}-${RECOVERY_ID}-run${GITHUB_RUN_NUMBER}}"
           } >> "$GITHUB_OUTPUT"
 
           {
@@ -964,7 +972,7 @@ jobs:
         with:
           token: ${{ github.token }}
           tag_name: ${{ steps.pack.outputs.tag }}
-          name: ${{ env.RECOVERY_NAME }} ${{ env.RECOVERY_VERSION }} | ${{ env.DEVICE }} | ${{ steps.pack.outputs.datetime }}
+          name: ${{ env.DEVICE }} | ${{ env.RECOVERY_NAME }} ${{ env.RECOVERY_VERSION }} | ${{ steps.pack.outputs.datetime }}
           prerelease: ${{ env.RELEASE_PRERELEASE == 'true' }}
           files: |
             ${{ steps.pack.outputs.zip_path }}
