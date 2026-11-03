@@ -78,6 +78,7 @@ name: Reusable Recovery Build
 # | common_tree_branch        | string | ""                                              | 公共设备树分支；空则用仓库默认分支 |
 # | common_tree_path          | string | ""                                              | 公共设备树放置路径，如 device/<vendor>/sm8250-common |
 # | device_patch_script       | string | ""                                              | 设备树克隆后执行的补丁脚本（相对路径）：先查仓库根目录，再查设备树根；失败仅告警 |
+# | workspace_patch_script    | string | ""                                              | 源码同步完成后在工作区根目录执行的补丁脚本（相对仓库根目录）：常用于修复上游 manifest/源码中的已知缺陷（如 SHRP 恢复的 bootable/recovery/prebuilt） |
 # | dependencies_local_manifest | bool | false                                           | 是否把设备树 *.dependencies 转成 .repo/local_manifests/roomservice.xml 并补一次 sync 拉依赖 |
 # | repopick_patches          | string | ""                                              | 空格分隔的 Gerrit change 号，envsetup 后、lunch 前执行 repopick |
 # | repopick_gerrit           | string | "https://gerrit.twrp.me"                        | repopick -g 使用的 Gerrit 地址 |
@@ -216,6 +217,7 @@ jobs:
           "common_tree_branch": "",
           "common_tree_path": "",
           "device_patch_script": "",
+          "workspace_patch_script": "",
           "dependencies_local_manifest": false,
           "repopick_patches": "",
           "repopick_gerrit": "https://gerrit.twrp.me",
@@ -604,8 +606,10 @@ jobs:
               exit 1
             fi
             chmod +x "$tmp/sync/$sync_script"
-            # 脚本遇到不支持的分支只打印帮助并 exit 0，因此必须自行校验同步结果
-            ( cd "$tmp/sync" && "./$sync_script" --branch "$fox" --path "$ws" --ssh 0 )
+            # 脚本遇到不支持的分支只打印帮助并 exit 0，因此必须自行校验同步结果。
+            # legacy 脚本内部按 $BASE_DIR/patches 查找补丁，而上游已把补丁移到 legacy/patches，
+            # 因此必须从脚本所在目录执行（legacy 分支即 legacy/，主脚本仍在仓库根目录）。
+            ( cd "$tmp/sync/$(dirname "$sync_script")" && "./$(basename "$sync_script")" --branch "$fox" --path "$ws" --ssh 0 )
             echo "::endgroup::"
             if [ ! -f "$ws/build/envsetup.sh" ]; then
               echo "::error::orangefox_sync.sh 未生成 $ws/build/envsetup.sh，fox_${fox} 源码同步失败"
@@ -737,6 +741,24 @@ jobs:
               ( cd "$(dirname "$patch_target")" && "./$(basename "$patch_target")" ) || echo "::warning::补丁脚本返回非零，继续构建"
             else
               echo "::warning::device_patch_script 指向的脚本不存在：$DEVICE_PATCH_SCRIPT"
+            fi
+          fi
+
+          # 可选：执行工作区级补丁脚本（在源码根目录运行，用于修复上游 manifest / 源码缺陷，
+          # 如 SHRP 恢复的 bootable/recovery/prebuilt/Android.bp）
+          if [ -n "${WORKSPACE_PATCH_SCRIPT:-}" ]; then
+            if [ -f "$GITHUB_WORKSPACE/$WORKSPACE_PATCH_SCRIPT" ]; then
+              echo "执行工作区补丁脚本：$WORKSPACE_PATCH_SCRIPT"
+              chmod +x "$GITHUB_WORKSPACE/$WORKSPACE_PATCH_SCRIPT"
+              ( cd "$WORKSPACE_DIR" && bash "$GITHUB_WORKSPACE/$WORKSPACE_PATCH_SCRIPT" ) \
+                || echo "::warning::workspace_patch_script 返回非零，继续构建"
+            elif [ -f "$WORKSPACE_DIR/$WORKSPACE_PATCH_SCRIPT" ]; then
+              echo "执行工作区补丁脚本：$WORKSPACE_DIR/$WORKSPACE_PATCH_SCRIPT"
+              chmod +x "$WORKSPACE_DIR/$WORKSPACE_PATCH_SCRIPT"
+              ( cd "$WORKSPACE_DIR" && bash "$WORKSPACE_DIR/$WORKSPACE_PATCH_SCRIPT" ) \
+                || echo "::warning::workspace_patch_script 返回非零，继续构建"
+            else
+              echo "::warning::workspace_patch_script 指向的脚本不存在：$WORKSPACE_PATCH_SCRIPT"
             fi
           fi
 
@@ -881,15 +903,23 @@ jobs:
           fi
 
           DATETIME="$(TZ="${TZ:-Asia/Shanghai}" date +%Y%m%d-%H%M)"
+          HUMAN_DATETIME="$(TZ="${TZ:-Asia/Shanghai}" date +%Y-%m-%d\ %H:%M)"
 
           # Recovery 标识：名称 + 版本，做文件名安全化（空格/斜杠/括号清成横杠）
           RECOVERY_SAFE="${RECOVERY_NAME// /-}"
           RECOVERY_SAFE="${RECOVERY_SAFE//\//-}"
           RECOVERY_SAFE="${RECOVERY_SAFE//(/}"
           RECOVERY_SAFE="${RECOVERY_SAFE//)/}"
+          SAFE_VERSION="${RECOVERY_VERSION// /-}"
+          SAFE_VERSION="${SAFE_VERSION//\//-}"
+          SAFE_VERSION="${SAFE_VERSION#v}"
+          SAFE_VERSION="${SAFE_VERSION#V}"
           RECOVERY_ID="${RECOVERY_SAFE}"
-          [ -n "${RECOVERY_VERSION:-}" ] && RECOVERY_ID="${RECOVERY_ID}-${RECOVERY_VERSION}"
+          [ -n "${SAFE_VERSION:-}" ] && RECOVERY_ID="${RECOVERY_ID}-v${SAFE_VERSION}"
           RECOVERY_ID="${RECOVERY_ID//--/-}"
+
+          DEFAULT_ARTIFACT="${RECOVERY_ID}-${DEVICE}"
+          RELEASE_TITLE="${RECOVERY_ID} for ${DEVICE} · ${HUMAN_DATETIME}"
 
           # 统一命名：设备 + recovery 标识 + 时间戳（可选 run 号做唯一化）
           TAG="${DEVICE}-${RECOVERY_ID}-${DATETIME}"
@@ -919,10 +949,12 @@ jobs:
           manifest: $MANIFEST_URL @ $MANIFEST_BRANCH
           device_tree: $DEVICE_TREE_URL @ ${DEVICE_TREE_BRANCH:-<default>}
           build_target: ${BUILD_TARGET_NORMALIZED:-$BUILD_TARGET}
-          built_at: $DATETIME (${TZ:-Asia/Shanghai})
+          built_at: $HUMAN_DATETIME (${TZ:-Asia/Shanghai})
           commit: $GITHUB_SHA
           run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
           image: $(basename "$IMG") (${size_mb}MB)
+          zip: $ZIP_NAME
+          sha256: ${ZIP_NAME}.sha256
           EOF
           zip -9 "$ZIP_NAME" build_info.txt
           sha256sum "$ZIP_NAME" > "$ZIP_NAME.sha256"
@@ -931,13 +963,15 @@ jobs:
           {
             echo "tag=$TAG"
             echo "datetime=$DATETIME"
+            echo "human_datetime=$HUMAN_DATETIME"
+            echo "release_title=$RELEASE_TITLE"
             echo "out_dir=$OUT"
             echo "zip_path=$OUT/$ZIP_NAME"
             echo "zip_name=$ZIP_NAME"
             echo "sha_path=$OUT/$ZIP_NAME.sha256"
             echo "img_name=$(basename "$IMG")"
             echo "img_size_mb=$size_mb"
-            echo "artifact=${ARTIFACT_NAME:-${DEVICE}-${RECOVERY_ID}-run${GITHUB_RUN_NUMBER}}"
+            echo "artifact=${ARTIFACT_NAME:-$DEFAULT_ARTIFACT}"
           } >> "$GITHUB_OUTPUT"
 
           {
@@ -972,17 +1006,17 @@ jobs:
         with:
           token: ${{ github.token }}
           tag_name: ${{ steps.pack.outputs.tag }}
-          name: ${{ env.DEVICE }} | ${{ env.RECOVERY_NAME }} ${{ env.RECOVERY_VERSION }} | ${{ steps.pack.outputs.datetime }}
+          name: ${{ steps.pack.outputs.release_title }}
           prerelease: ${{ env.RELEASE_PRERELEASE == 'true' }}
           files: |
             ${{ steps.pack.outputs.zip_path }}
             ${{ steps.pack.outputs.sha_path }}
           body: |
-            **${{ env.RECOVERY_NAME }} ${{ env.RECOVERY_VERSION }}** for `${{ env.DEVICE }}`
+            **${{ env.RECOVERY_NAME }} v${{ env.RECOVERY_VERSION }}** for `${{ env.DEVICE }}`
 
             | 项目 | 值 |
             | --- | --- |
-            | 构建时间 | ${{ steps.pack.outputs.datetime }} (${{ env.TZ }}) |
+            | 构建时间 | ${{ steps.pack.outputs.human_datetime }} (${{ env.TZ }}) |
             | 源码 | `${{ env.MANIFEST_URL }}` @ `${{ env.MANIFEST_BRANCH }}` |
             | 设备树 | `${{ env.DEVICE_TREE_URL }}` @ `${{ env.DEVICE_TREE_BRANCH }}` |
             | 构建目标 | `${{ env.BUILD_TARGET }}` |

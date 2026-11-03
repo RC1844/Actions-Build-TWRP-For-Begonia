@@ -13,7 +13,7 @@
       "device_tree_path": "device/redmi/begonia",
       "device_patch_script": ".github/scripts/patch_fbe_unmount.sh",
       "lunch_prefix": "twrp",
-      "publish_release": false
+      "publish_release": true
     }
   },
   {
@@ -31,7 +31,7 @@
       "device_patch_script": ".github/scripts/patch_fbe_unmount.sh",
       "lunch_prefix": "twrp",
       "java_version": "11",
-      "publish_release": false
+      "publish_release": true
     }
   },
   {
@@ -48,25 +48,10 @@
       "device_tree_branch": "MIUI-android-11.0",
       "device_tree_path": "device/redmi/begonia",
       "device_patch_script": ".github/scripts/patch_fbe_unmount.sh",
+      "workspace_patch_script": ".github/scripts/patch_shrp_prebuilt.sh",
       "lunch_prefix": "twrp",
-      "publish_release": false
-    }
-  },
-  {
-    "profile": "twrp-omni-11.0",
-    "label": "TWRP / twrp-11.0 (omni)",
-    "config": {
-      "recovery_name": "TWRP",
-      "recovery_version": "11.0",
-      "device": "begonia",
-      "manifest_url": "https://github.com/RC1844/platform_manifest_twrp_omni",
-      "manifest_branch": "twrp-11.0",
-      "device_tree_url": "https://github.com/RC1844/twrp_redmi_begonia",
-      "device_tree_branch": "MIUI-android-11.0",
-      "device_tree_path": "device/redmi/begonia",
-      "device_patch_script": ".github/scripts/patch_fbe_unmount.sh",
-      "lunch_prefix": "omni",
-      "publish_release": false
+      "extra_packages": "python2.7",
+      "publish_release": true
     }
   },
   {
@@ -84,7 +69,7 @@
       "device_patch_script": ".github/scripts/patch_fbe_unmount.sh",
       "lunch_prefix": "twrp",
       "java_version": "11",
-      "publish_release": false
+      "publish_release": true
     }
   },
   {
@@ -106,7 +91,7 @@
         "OF_SCREEN_H": "2160",
         "OF_PATCH_AVB20": "1"
       },
-      "publish_release": false
+      "publish_release": true
     }
   },
   {
@@ -129,7 +114,7 @@
         "OF_SCREEN_H": "2160",
         "OF_PATCH_AVB20": "1"
       },
-      "publish_release": false
+      "publish_release": true
     }
   }
 ]
