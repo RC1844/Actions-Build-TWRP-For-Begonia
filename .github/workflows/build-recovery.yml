@@ -78,6 +78,7 @@ name: Reusable Recovery Build
 # | common_tree_branch        | string | ""                                              | 公共设备树分支；空则用仓库默认分支 |
 # | common_tree_path          | string | ""                                              | 公共设备树放置路径，如 device/<vendor>/sm8250-common |
 # | device_patch_script       | string | ""                                              | 设备树克隆后执行的补丁脚本（相对路径）：先查仓库根目录，再查设备树根；失败仅告警 |
+# | workspace_patch_script    | string | ""                                              | 源码同步完成后在工作区根目录执行的补丁脚本（相对仓库根目录）：常用于修复上游 manifest/源码中的已知缺陷（如 SHRP 恢复的 bootable/recovery/prebuilt） |
 # | dependencies_local_manifest | bool | false                                           | 是否把设备树 *.dependencies 转成 .repo/local_manifests/roomservice.xml 并补一次 sync 拉依赖 |
 # | repopick_patches          | string | ""                                              | 空格分隔的 Gerrit change 号，envsetup 后、lunch 前执行 repopick |
 # | repopick_gerrit           | string | "https://gerrit.twrp.me"                        | repopick -g 使用的 Gerrit 地址 |
@@ -216,6 +217,7 @@ jobs:
           "common_tree_branch": "",
           "common_tree_path": "",
           "device_patch_script": "",
+          "workspace_patch_script": "",
           "dependencies_local_manifest": false,
           "repopick_patches": "",
           "repopick_gerrit": "https://gerrit.twrp.me",
@@ -739,6 +741,24 @@ jobs:
               ( cd "$(dirname "$patch_target")" && "./$(basename "$patch_target")" ) || echo "::warning::补丁脚本返回非零，继续构建"
             else
               echo "::warning::device_patch_script 指向的脚本不存在：$DEVICE_PATCH_SCRIPT"
+            fi
+          fi
+
+          # 可选：执行工作区级补丁脚本（在源码根目录运行，用于修复上游 manifest / 源码缺陷，
+          # 如 SHRP 恢复的 bootable/recovery/prebuilt/Android.bp）
+          if [ -n "${WORKSPACE_PATCH_SCRIPT:-}" ]; then
+            if [ -f "$GITHUB_WORKSPACE/$WORKSPACE_PATCH_SCRIPT" ]; then
+              echo "执行工作区补丁脚本：$WORKSPACE_PATCH_SCRIPT"
+              chmod +x "$GITHUB_WORKSPACE/$WORKSPACE_PATCH_SCRIPT"
+              ( cd "$WORKSPACE_DIR" && bash "$GITHUB_WORKSPACE/$WORKSPACE_PATCH_SCRIPT" ) \
+                || echo "::warning::workspace_patch_script 返回非零，继续构建"
+            elif [ -f "$WORKSPACE_DIR/$WORKSPACE_PATCH_SCRIPT" ]; then
+              echo "执行工作区补丁脚本：$WORKSPACE_DIR/$WORKSPACE_PATCH_SCRIPT"
+              chmod +x "$WORKSPACE_DIR/$WORKSPACE_PATCH_SCRIPT"
+              ( cd "$WORKSPACE_DIR" && bash "$WORKSPACE_DIR/$WORKSPACE_PATCH_SCRIPT" ) \
+                || echo "::warning::workspace_patch_script 返回非零，继续构建"
+            else
+              echo "::warning::workspace_patch_script 指向的脚本不存在：$WORKSPACE_PATCH_SCRIPT"
             fi
           fi
 
